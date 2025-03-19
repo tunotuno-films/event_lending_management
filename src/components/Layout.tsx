@@ -12,7 +12,8 @@ import {
   History,
   BarChart,
   Menu,
-  X
+  X,
+  LogOut // LogOutアイコンを追加
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -119,9 +120,9 @@ export default function Layout({
               <Menu size={24} />
             </button>
             
-            {/* ページタイトル */}
+            {/* 固定のシステム名を表示 */}
             <h1 className="text-lg font-semibold text-gray-800 truncate">
-              {getPageTitle()}
+              貸出管理システム
             </h1>
           </div>
           
@@ -131,11 +132,15 @@ export default function Layout({
               <div className="relative flex items-center">
                 <button 
                   onClick={() => setShowLogoutModal(true)}
-                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                  className="text-sm text-gray-600 hover:text-gray-800"
                 >
-                  <span className="hidden sm:inline mr-2">ようこそ、</span>
-                  <span className="font-medium truncate max-w-[100px]">{userName || userEmail?.split('@')[0] || 'ゲスト'}</span>
-                  <span className="hidden sm:inline">さん</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center">
+                    <span className="text-xs sm:text-sm sm:mr-2">ようこそ</span>
+                    <span className="font-medium truncate max-w-[100px]">
+                      {userName || userEmail?.split('@')[0] || 'ゲスト'}
+                    </span>
+                    <span className="hidden sm:inline">さん</span>
+                  </div>
                 </button>
               </div>
             ) : (
@@ -292,7 +297,7 @@ export default function Layout({
                   onClick={() => setShowLogoutModal(true)}
                   className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
                 >
-                  <Settings className="mr-3" size={20} />
+                  <LogOut className="mr-3" size={20} /> {/* Settingsから適切なLogOutアイコンに変更 */}
                   <span>ログアウト</span>
                 </button>
               </nav>

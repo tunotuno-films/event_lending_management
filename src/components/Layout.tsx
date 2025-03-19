@@ -164,6 +164,15 @@ export default function Layout({
             )}
           </div>
         </div>
+        
+        {/* パンくずリスト - PC・スマホ両方で表示 */}
+        <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+          <div className="text-sm text-gray-600">
+            <span className="text-gray-400">ホーム</span>
+            <span className="mx-2">›</span>
+            <span className="font-medium">{getPageTitle()}</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-1">

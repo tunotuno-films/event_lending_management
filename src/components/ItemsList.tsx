@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
-import '../index.css';
 
 interface Item {
   item_id: string;

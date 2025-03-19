@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
+import '../index.css';
 
 interface Item {
   item_id: string;
@@ -453,7 +454,7 @@ export default function ItemsList() {
           showUndo={notification.lastDeletedItem !== undefined}
         />
       )}
-
+  
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">登録物品一覧</h2>
         <div className="flex gap-2">
@@ -462,87 +463,95 @@ export default function ItemsList() {
           </button>
         </div>
       </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                画像
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                物品ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                物品名
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ジャンル
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                管理者
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                登録日
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                操作
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {items.map((item) => (
-              <tr key={item.item_id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="h-12 w-12 rounded-lg overflow-hidden">
-                    <img
-                      src={item.image || 'https://via.placeholder.com/150'}
-                      alt={item.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{item.name}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {item.genre}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                    {item.manager}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(item.registered_date)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end gap-4">
-                    <button
-                      onClick={() => setEditingItem(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => setDeletingItem(item)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
+  
+      <div className="w-full overflow-hidden border border-gray-200 rounded-lg">
+        <div className="w-full min-w-[800px]">
+          <table className="w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  画像
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  物品ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  物品名
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ジャンル
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  管理者
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  登録日
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+          </table>
+        </div>
+        
+        <div className="overflow-x-auto w-full max-h-[70vh]">
+          <table className="w-full min-w-[800px] divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200">
+              {items.map((item) => (
+                <tr key={item.item_id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="h-12 w-12 rounded-lg overflow-hidden">
+                      <img
+                        src={item.image || 'https://via.placeholder.com/150'}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{item.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {item.genre}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                      {item.manager}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatDate(item.registered_date)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end gap-4">
+                      <button
+                        onClick={() => setEditingItem(item)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => setDeletingItem(item)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-
+  
+      {/* モーダル部分 */}
       {editingItem && (
         <EditModal
           item={editingItem}
@@ -552,7 +561,7 @@ export default function ItemsList() {
           managers={managers}
         />
       )}
-
+  
       {deletingItem && (
         <DeleteConfirmModal
           item={deletingItem}

@@ -60,278 +60,267 @@ export default function Layout({
     fetchUserName();
   }, [isAuthenticated, userEmail]);
 
-  // サイドバーを閉じる（モバイル画面でリンクをクリックした時に閉じる）
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-  };
-
-  // ログアウト処理
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsAuthenticated(false);
-    setShowLogoutModal(false);
-    navigate('/');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setIsAuthenticated(false);
+      setShowLogoutModal(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
-  // 表示名を決定（名前があればそれを、なければメールアドレスを使用）
-  const displayName = userName || userEmail;
+  // パンくずリストのタイトルを取得
+  const getPageTitle = () => {
+    const path = location.pathname;
+    
+    switch(path) {
+      case '/':
+        return '物品登録';
+      case '/items':
+        return '物品一覧';
+      case '/events/register':
+        return 'イベント登録';
+      case '/daily-registration':
+        return '当日物品登録';
+      case '/events':
+        return 'イベント一覧';
+      case '/loan-management':
+        return '貸出管理';
+      case '/loan-history':
+        return '貸出履歴';
+      case '/loan-statistics':
+        return '貸出統計';
+      case '/profile':
+        return 'プロフィール';
+      default:
+        return '';
+    }
+  };
+
+  // サイドバートグルを処理
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* オーバーレイ (モバイル画面でサイドバーが開いている時に表示) */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
-          onClick={closeSidebar}
-        />
-      )}
-
-      {/* サイドバー */}
-      <aside className={`fixed h-full bg-white shadow-md z-30 w-64 transition-all duration-300 ${
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } md:translate-x-0`}>
-        <div className="p-4 border-b flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Barcode className="w-6 h-6" />
-            <span className="font-semibold">貸出管理システム</span>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* ヘッダー */}
+      <div className="bg-white shadow-sm w-full">
+        <div className="px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center">
+            <button 
+              onClick={toggleSidebar} 
+              className="text-gray-500 hover:text-gray-700 md:hidden mr-3"
+            >
+              <Menu size={24} />
+            </button>
+            
+            {/* ページタイトル */}
+            <h1 className="text-lg font-semibold text-gray-800 truncate">
+              {getPageTitle()}
+            </h1>
           </div>
-          {/* モバイル画面での閉じるボタン */}
-          <button className="md:hidden" onClick={closeSidebar}>
-            <X size={24} />
-          </button>
-        </div>
-        
-        <nav className="p-4 h-[calc(100vh-80px)] overflow-y-auto">
-          <div className="space-y-2">
-            <Link
-              to="/"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <Home size={18} />
-              <span>物品登録</span>
-            </Link>
-            <Link
-              to="/items"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/items' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <LayoutList size={18} />
-              <span>物品一覧</span>
-            </Link>
-            <Link
-              to="/events/register"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <CreditCard size={18} />
-              <span>イベント登録</span>
-            </Link>
-            <Link
-              to="/events"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/events' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <LayoutList size={18} />
-              <span>イベント一覧</span>
-            </Link>
-            <Link
-              to="/daily-registration"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <Settings size={18} />
-              <span>当日物品登録</span>
-            </Link>
-            <Link
-              to="/loan-management"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <Settings size={18} />
-              <span>貸出管理</span>
-            </Link>
-            <Link
-              to="/loan-history"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/loan-history' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <History size={18} />
-              <span>貸出履歴</span>
-            </Link>
-            <Link
-              to="/loan-statistics"
-              className={`flex items-center gap-2 p-2 ${
-                location.pathname === '/loan-statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-              } rounded`}
-              onClick={closeSidebar}
-            >
-              <BarChart size={18} />
-              <span>貸出統計</span>
-            </Link>
-          </div>
-
-          <div className="mt-8">
-            <div className="text-xs font-semibold text-gray-400 uppercase mb-4">Account pages</div>
-            <div className="space-y-2">
-              <Link
-                to="/profile"
-                className={`flex items-center gap-2 p-2 ${
-                  location.pathname === '/profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
-                } rounded`}
-                onClick={closeSidebar}
-              >
-                <User size={18} />
-                <span>プロフィール</span>
-              </Link>
-              {!isAuthenticated ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setAuthMode('signin');
-                      setShowAuthModal(true);
-                      closeSidebar();
-                    }}
-                    className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-50 rounded w-full"
-                  >
-                    <LogIn size={18} />
-                    <span>ログイン</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAuthMode('signup');
-                      setShowAuthModal(true);
-                      closeSidebar();
-                    }}
-                    className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-50 rounded w-full"
-                  >
-                    <UserPlus size={18} />
-                    <span>会員登録</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    setShowLogoutModal(true);
-                    closeSidebar();
-                  }}
-                  className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-50 rounded w-full"
-                >
-                  <LogIn size={18} />
-                  <span>ログアウト</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </nav>
-
-        <div className="p-4 mt-auto">
-          <div className="text-center text-sm text-gray-600">
-            {new Date().toLocaleString('ja-JP')}
-          </div>
-        </div>
-      </aside>
-
-      {/* メインコンテンツ */}
-      <div className="flex-1 transition-all duration-300 md:ml-64">
-        {/* ヘッダー */}
-        <header className="bg-white shadow-sm p-4 sticky top-0 z-10 flex justify-between items-center">
-          {/* ハンバーガーメニューアイコン (モバイル画面のみ表示) */}
-          <button 
-            className="md:hidden flex items-center justify-center p-2"
-            onClick={() => setIsSidebarOpen(true)}
-          >
-            <Menu size={24} />
-          </button>
-
-          {/* タイトル */}
-          <div className="md:hidden text-lg font-semibold">
-            {location.pathname === '/' && '物品登録'}
-            {location.pathname === '/items' && '物品一覧'}
-            {location.pathname === '/events/register' && 'イベント登録'}
-            {location.pathname === '/events' && 'イベント一覧'}
-            {location.pathname === '/daily-registration' && '当日物品登録'}
-            {location.pathname === '/loan-management' && '貸出管理'}
-            {location.pathname === '/loan-history' && '貸出履歴'}
-            {location.pathname === '/loan-statistics' && '貸出統計'}
-          </div>
-
+          
           {/* ユーザー情報 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             {isAuthenticated ? (
-              <div className="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded-lg truncate max-w-xs">
-                ようこそ {displayName} さん
+              <div className="relative flex items-center">
+                <button 
+                  onClick={() => setShowLogoutModal(true)}
+                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                >
+                  <span className="hidden sm:inline mr-2">ようこそ、</span>
+                  <span className="font-medium truncate max-w-[100px]">{userName || userEmail?.split('@')[0] || 'ゲスト'}</span>
+                  <span className="hidden sm:inline">さん</span>
+                </button>
               </div>
             ) : (
-              <button
-                onClick={() => {
-                  setAuthMode('signin');
-                  setShowAuthModal(true);
-                }}
-                className="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg"
-              >
-                Sign In
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setShowAuthModal(true);
+                  }}
+                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                >
+                  <LogIn size={16} className="mr-1" />
+                  <span className="hidden sm:inline">ログイン</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setShowAuthModal(true);
+                  }}
+                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                >
+                  <UserPlus size={16} className="mr-1" />
+                  <span className="hidden sm:inline">会員登録</span>
+                </button>
+              </div>
             )}
           </div>
-        </header>
+        </div>
+      </div>
 
-        {/* メインコンテンツ */}
-        <main className="p-4 md:p-8">
-          {/* パンくずリスト (モバイル以外で表示) */}
-          <div className="hidden md:flex mb-8 justify-between items-center">
-            <nav className="text-sm">
-              <ol className="flex items-center space-x-2">
-                <li><Link to="/" className="text-gray-500">貸出管理システム</Link></li>
-                <li className="text-gray-400">/</li>
-                <li className="text-gray-900">
-                  {location.pathname === '/' && '物品登録'}
-                  {location.pathname === '/items' && '物品一覧'}
-                  {location.pathname === '/events/register' && 'イベント登録'}
-                  {location.pathname === '/events' && 'イベント一覧'}
-                  {location.pathname === '/daily-registration' && '当日物品登録'}
-                  {location.pathname === '/loan-management' && '貸出管理'}
-                  {location.pathname === '/loan-history' && '貸出履歴'}
-                  {location.pathname === '/loan-statistics' && '貸出統計'}
-                </li>
-              </ol>
-            </nav>
+      <div className="flex flex-1">
+        {/* サイドバー */}
+        <div className={`
+          bg-white shadow-sm fixed inset-y-0 left-0 z-30 w-64 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:translate-x-0
+        `}>
+          {/* スマホ用閉じるボタン */}
+          <div className="px-4 py-3 flex justify-between items-center border-b md:hidden">
+            <h1 className="text-xl font-semibold text-gray-800">在庫管理</h1>
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X size={24} />
+            </button>
           </div>
-
+          
+          {/* サイドバーコンテンツ */}
+          <div className="py-4">
+            {/* メニューアイテム */}
+            <div className="px-4 mb-6">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                物品管理
+              </div>
+              <nav className="space-y-1">
+                <Link 
+                  to="/"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <Barcode className="mr-3" size={20} />
+                  <span>物品登録</span>
+                </Link>
+                <Link 
+                  to="/items"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/items' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <LayoutList className="mr-3" size={20} />
+                  <span>物品一覧</span>
+                </Link>
+              </nav>
+            </div>
+            
+            <div className="px-4 mb-6">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                イベント
+              </div>
+              <nav className="space-y-1">
+                <Link 
+                  to="/events/register"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <Home className="mr-3" size={20} />
+                  <span>イベント登録</span>
+                </Link>
+                <Link 
+                  to="/events"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <LayoutList className="mr-3" size={20} />
+                  <span>イベント一覧</span>
+                </Link>
+                <Link 
+                  to="/daily-registration"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <Barcode className="mr-3" size={20} />
+                  <span>当日物品登録</span>
+                </Link>
+              </nav>
+            </div>
+            
+            <div className="px-4 mb-6">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                貸出管理
+              </div>
+              <nav className="space-y-1">
+                <Link 
+                  to="/loan-management"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <CreditCard className="mr-3" size={20} />
+                  <span>貸出管理</span>
+                </Link>
+                <Link 
+                  to="/loan-history"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-history' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <History className="mr-3" size={20} />
+                  <span>貸出履歴</span>
+                </Link>
+                <Link 
+                  to="/loan-statistics"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <BarChart className="mr-3" size={20} />
+                  <span>貸出統計</span>
+                </Link>
+              </nav>
+            </div>
+            
+            <div className="px-4">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                アカウント
+              </div>
+              <nav className="space-y-1">
+                <Link 
+                  to="/profile"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <User className="mr-3" size={20} />
+                  <span>プロフィール</span>
+                </Link>
+                <button 
+                  onClick={() => setShowLogoutModal(true)}
+                  className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                >
+                  <Settings className="mr-3" size={20} />
+                  <span>ログアウト</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+        
+        {/* オーバーレイバックドロップ - スマホでサイドバーが開いた時 */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          ></div>
+        )}
+        
+        {/* メインコンテンツ */}
+        <div className="flex-1 p-4 md:p-6 overflow-x-hidden">
           {children}
-        </main>
+        </div>
       </div>
 
       {/* ログアウト確認モーダル */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">ログアウト確認</h3>
-            <p className="mb-6">ログアウトしますか？</p>
-            <div className="flex justify-end gap-3">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 className="text-lg font-medium mb-4">ログアウト確認</h3>
+            <p className="text-gray-600 mb-6">ログアウトしてもよろしいですか？</p>
+            <div className="flex justify-end gap-4">
               <button
                 onClick={() => setShowLogoutModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 キャンセル
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
                 ログアウト
               </button>

@@ -19,6 +19,7 @@ import LoanStatistics from './components/LoanStatistics';
 import BulkUploadModal from './components/BulkUploadModal';
 import CsvValidation from './components/CsvValidation';
 import Profile from './components/Profile';
+import './index.css';
 
 interface FormData {
   barcode: string;

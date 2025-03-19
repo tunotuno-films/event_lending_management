@@ -255,11 +255,11 @@ export default function DailyItemRegistration() {
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="h-12 w-12 rounded-lg overflow-hidden">
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                           <img
                             src={item.image || 'https://via.placeholder.com/150'}
                             alt={item.name}
-                            className="h-full w-full object-cover"
+                            className="max-h-full max-w-full object-contain"
                           />
                         </div>
                       </td>

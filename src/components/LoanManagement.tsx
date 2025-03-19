@@ -369,11 +369,11 @@ export default function LoanManagement() {
                       {waitingItems.map((control) => (
                         <tr key={control.control_id}>
                           <td className="px-4 py-2">
-                            <div className="h-12 w-12 rounded-lg overflow-hidden">
+                            <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                               <img
                                 src={control.item.image || 'https://via.placeholder.com/150'}
                                 alt={control.item.name}
-                                className="h-full w-full object-cover"
+                                className="max-h-full max-w-full object-contain"
                               />
                             </div>
                           </td>
@@ -419,11 +419,11 @@ export default function LoanManagement() {
                       {loanedItems.map((control) => (
                         <tr key={control.control_id}>
                           <td className="px-4 py-2">
-                            <div className="h-12 w-12 rounded-lg overflow-hidden">
+                            <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                               <img
                                 src={control.item.image || 'https://via.placeholder.com/150'}
                                 alt={control.item.name}
-                                className="h-full w-full object-cover"
+                                className="max-h-full max-w-full object-contain"
                               />
                             </div>
                           </td>
@@ -502,7 +502,7 @@ export default function LoanManagement() {
 
               {showCamera && (
                 <div className="relative w-full max-w-lg mx-auto aspect-video mb-4 rounded-lg overflow-hidden">
-                  <video ref={ref} className="w-full h-full object-cover" />
+                  <video ref={ref as React.LegacyRef<HTMLVideoElement>} className="w-full h-full object-cover" />
                 </div>
               )}
 
@@ -520,11 +520,11 @@ export default function LoanManagement() {
                   {matchingItems.map((item) => (
                     <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded overflow-hidden">
+                        <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white">
                           <img
                             src={item.item.image || 'https://via.placeholder.com/150'}
                             alt={item.item.name}
-                            className="h-full w-full object-cover"
+                            className="max-h-full max-w-full object-contain"
                           />
                         </div>
                         <span className="text-sm font-mono">{item.item_id}</span>
@@ -605,11 +605,11 @@ export default function LoanManagement() {
                   {matchingItems.map((item) => (
                     <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded overflow-hidden">
+                        <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white">
                           <img
                             src={item.item.image || 'https://via.placeholder.com/150'}
                             alt={item.item.name}
-                            className="h-full w-full object-cover"
+                            className="max-h-full max-w-full object-contain"
                           />
                         </div>
                         <span className="text-sm font-mono">{item.item_id}</span>

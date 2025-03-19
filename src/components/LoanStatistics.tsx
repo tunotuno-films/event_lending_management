@@ -338,11 +338,11 @@ export default function LoanStatistics() {
                 {statistics.map((stat) => (
                   <tr key={stat.item_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                         <img
                           src={stat.image || 'https://via.placeholder.com/150'}
                           alt={stat.item_name}
-                          className="h-full w-full object-cover"
+                          className="max-h-full max-w-full object-contain"
                         />
                       </div>
                     </td>
@@ -399,11 +399,11 @@ export default function LoanStatistics() {
                         return (
                           <tr key={`heatmap-${stat.item_id}`} className="hover:bg-gray-50">
                             <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
-                              <div className="h-12 w-12 rounded-lg overflow-hidden">
+                              <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                                 <img
                                   src={stat.image || 'https://via.placeholder.com/150'}
                                   alt={stat.item_name}
-                                  className="h-full w-full object-cover"
+                                  className="max-h-full max-w-full object-contain"
                                 />
                               </div>
                             </td>

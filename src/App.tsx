@@ -607,11 +607,19 @@ function App() {
             <div className="flex-1"></div>
             
             {/* ようこそメッセージ - 中央配置 */}
-            <div className="animate-scale-up">
-              <div className="flex items-center justify-center space-x-3">
+            <div className="animate-scale-up text-center px-4">
+              {/* PC用レイアウト - 横並び */}
+              <div className="hidden sm:flex items-center justify-center space-x-3">
                 <span className="text-5xl font-bold text-white">ようこそ</span>
                 <span className="text-5xl font-bold text-white">{welcomeUserName}</span>
                 <span className="text-5xl font-bold text-white">さん</span>
+              </div>
+              
+              {/* スマホ用レイアウト - 縦並び */}
+              <div className="flex flex-col items-center sm:hidden">
+                <span className="text-4xl font-bold text-white mb-2">ようこそ</span>
+                <span className="text-4xl font-bold text-white">{welcomeUserName}</span>
+                <span className="text-4xl font-bold text-white">さん</span>
               </div>
             </div>
             

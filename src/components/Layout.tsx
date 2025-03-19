@@ -127,47 +127,47 @@ export default function Layout({
           </div>
           
           {/* ユーザー情報 */}
-          <div className="flex items-center">
-            {isAuthenticated ? (
-              <div className="relative flex items-center">
-                <button 
-                  onClick={() => setShowLogoutModal(true)}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center">
-                    <span className="text-xs sm:text-sm sm:mr-2">ようこそ</span>
-                    <span className="font-medium truncate max-w-[100px]">
-                      {userName || userEmail?.split('@')[0] || 'ゲスト'}
-                    </span>
-                    <span className="hidden sm:inline">さん</span>
-                  </div>
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => {
-                    setAuthMode('signin');
-                    setShowAuthModal(true);
-                  }}
-                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
-                >
-                  <LogIn size={16} className="mr-1" />
-                  <span className="hidden sm:inline">ログイン</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setAuthMode('signup');
-                    setShowAuthModal(true);
-                  }}
-                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
-                >
-                  <UserPlus size={16} className="mr-1" />
-                  <span className="hidden sm:inline">会員登録</span>
-                </button>
-              </div>
-            )}
-          </div>
+<div className="flex items-center">
+  {isAuthenticated ? (
+    <div className="relative flex items-center">
+      <button 
+        onClick={() => setShowLogoutModal(true)}
+        className="text-sm text-gray-600 hover:text-gray-800"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center">
+          <span className="text-xs sm:text-sm sm:mr-2">ようこそ</span>
+          <span className="font-medium truncate max-w-[100px]">
+            {userName || userEmail?.split('@')[0] || 'ゲスト'}
+          </span>
+          <span className="hidden sm:inline">さん</span>
+        </div>
+      </button>
+    </div>
+  ) : (
+    <div className="flex gap-2">
+      <button 
+        onClick={() => {
+          setAuthMode('signin');
+          setShowAuthModal(true);
+        }}
+        className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+      >
+        <LogIn size={16} className="mr-1" />
+        <span className="hidden sm:inline">ログイン</span>
+      </button>
+      <button 
+        onClick={() => {
+          setAuthMode('signup');
+          setShowAuthModal(true);
+        }}
+        className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+      >
+        <UserPlus size={16} className="mr-1" />
+        <span className="hidden sm:inline">会員登録</span>
+      </button>
+    </div>
+  )}
+</div>
         </div>
         
         {/* パンくずリスト - PC・スマホ両方で表示 */}

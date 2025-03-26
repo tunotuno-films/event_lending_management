@@ -42,16 +42,36 @@ export default function Layout({
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // ユーザーの名前を取得
+  // ユーザーの名前とプロフィール画像を取得
   useEffect(() => {
-    const fetchUserName = async () => {
-      if (isAuthenticated && userEmail) {
+    const fetchUserInfo = async () => {
+      if (isAuthenticated) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
-          if (user && user.user_metadata) {
-            setUserName(user.user_metadata.name || null);
-          } else {
-            setUserName(null);
+          if (user) {
+            // ユーザー名を設定
+            if (user.user_metadata) {
+              setUserName(user.user_metadata.name || 
+                          user.user_metadata.full_name || 
+                          user.email?.split('@')[0] || 'ゲスト');
+            } else {
+              setUserName(user.email?.split('@')[0] || 'ゲスト');
+            }
+            
+            // プロフィール画像を取得（Googleのavatar_urlなど）
+            const avatarUrl = user.user_metadata?.avatar_url || 
+                             user.user_metadata?.picture || 
+                             userProfileImage;
+            
+            if (avatarUrl) {
+              // 既にpropsからuserProfileImageが渡されていれば、それを優先して使う
+              // そうでなければ、user_metadataからの画像URLを使用
+              if (!userProfileImage) {
+                // 親コンポーネントでuserProfileImageが更新できるよう
+                // ここではコンソールに出力するだけ
+                console.log('Found user avatar in metadata:', avatarUrl);
+              }
+            }
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -60,8 +80,8 @@ export default function Layout({
       }
     };
 
-    fetchUserName();
-  }, [isAuthenticated, userEmail]);
+    fetchUserInfo();
+  }, [isAuthenticated, userEmail, userProfileImage]);
 
   const handleLogout = async () => {
     try {

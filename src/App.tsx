@@ -679,6 +679,71 @@ function App() {
     }
   };
 
+  // ユーザープロフィール画像のステート
+  const fetchUserProfileImage = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Googleなどのプロバイダーから取得したプロフィール画像
+        const avatarUrl = user.user_metadata?.avatar_url || 
+                         user.user_metadata?.picture;
+        
+        if (avatarUrl) {
+          setUserProfileImage(avatarUrl);
+        } else {
+          // プロフィールテーブルから取得を試みる
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .single();
+            
+          if (data?.avatar_url) {
+            setUserProfileImage(data.avatar_url);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile image:', error);
+    }
+  };
+
+  // 認証状態の変更を監視
+  useEffect(() => {
+    // 初回ロード時にプロフィール画像を取得
+    if (isAuthenticated) {
+      fetchUserProfileImage();
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setIsAuthenticated(!!session);
+      setUserEmail(session?.user?.email || null);
+      
+      if (session?.user) {
+        // ユーザー名を取得
+        const userName = session.user.user_metadata?.name || 
+                        session.user.user_metadata?.full_name || 
+                        session.user.email?.split('@')[0] || 'ゲスト';
+        setWelcomeUserName(userName);
+        
+        // プロフィール画像を取得
+        const avatarUrl = session.user.user_metadata?.avatar_url || 
+                         session.user.user_metadata?.picture;
+        if (avatarUrl) {
+          setUserProfileImage(avatarUrl);
+        } else {
+          fetchUserProfileImage();
+        }
+      } else {
+        setUserProfileImage(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isAuthenticated]);
+
   return (
     <Router>
       <div>

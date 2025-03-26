@@ -242,3 +242,22 @@ export const safelyFetchData = async (tableName: string, query = {}) => {
     return { data: null, error };
   }
 };
+
+// Google認証からのリダイレクト処理を追加
+export const handleAuthRedirect = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  
+  // URLからハッシュパラメータを取得
+  const hashParams = window.location.hash;
+  if (hashParams && (hashParams.includes('access_token') || hashParams.includes('error'))) {
+    // セッション確立を試みる
+    const { data, error } = await supabase.auth.getSession();
+    
+    // URLからハッシュを削除（クリーンアップ）
+    window.history.replaceState(null, '', window.location.pathname);
+    
+    return { data, error };
+  }
+  
+  return { data, error };
+};

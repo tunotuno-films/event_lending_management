@@ -475,6 +475,7 @@ function App() {
   const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
   const [welcomeUserName, setWelcomeUserName] = useState('');
   const [isWelcomeAnimationFading, setIsWelcomeAnimationFading] = useState(false);
+  const [userProfileImage, setUserProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -514,6 +515,13 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
       setUserEmail(session?.user?.email || null);
+      
+      // ユーザーが認証されていれば、プロフィール情報を取得
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setUserProfileImage(null);
+      }
     });
 
     return () => {
@@ -649,6 +657,25 @@ function App() {
     } catch (error) {
       console.error('Google authentication error:', error);
       alert('Google認証エラーが発生しました');
+    }
+  };
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      // プロフィール情報を取得
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data?.avatar_url) {
+        setUserProfileImage(data.avatar_url);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
     }
   };
 
@@ -850,6 +877,7 @@ function App() {
             setAuthMode={setAuthMode}
             userEmail={userEmail}
             setIsAuthenticated={setIsAuthenticated}
+            userProfileImage={userProfileImage}
           >
             <Routes>
               <Route path="/" element={<RegisterItem />} />

@@ -23,7 +23,8 @@ interface LayoutProps {
   setShowAuthModal: (show: boolean) => void;
   setAuthMode: (mode: 'signin' | 'signup') => void;
   userEmail: string | null;
-  setIsAuthenticated: (authenticated: boolean) => void;
+  setIsAuthenticated: (isAuthenticated: boolean) => void;
+  userProfileImage?: string | null; // プロフィール画像URLを追加
 }
 
 export default function Layout({
@@ -32,7 +33,8 @@ export default function Layout({
   setShowAuthModal,
   setAuthMode,
   userEmail,
-  setIsAuthenticated
+  setIsAuthenticated,
+  userProfileImage, // 新しいプロパティを追加
 }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,8 +48,8 @@ export default function Layout({
       if (isAuthenticated && userEmail) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
-          if (user && user.user_metadata && user.user_metadata.name) {
-            setUserName(user.user_metadata.name);
+          if (user && user.user_metadata) {
+            setUserName(user.user_metadata.name || null);
           } else {
             setUserName(null);
           }
@@ -132,14 +134,23 @@ export default function Layout({
     <div className="relative flex items-center">
       <button 
         onClick={() => setShowLogoutModal(true)}
-        className="text-sm text-gray-600 hover:text-gray-800"
+        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center">
-          <span className="text-xs sm:text-sm sm:mr-2">ようこそ</span>
-          <span className="font-medium truncate max-w-[100px]">
-            {userName || userEmail?.split('@')[0] || 'ゲスト'}
-          </span>
-          <span className="hidden sm:inline">さん</span>
+        <span className="font-medium truncate max-w-[120px]">
+          {userName || userEmail?.split('@')[0] || 'ゲスト'}
+        </span>
+        
+        {/* ユーザーアイコン - プロフィール画像があれば表示、なければデフォルトアイコン */}
+        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+          {userProfileImage ? (
+            <img 
+              src={userProfileImage} 
+              alt="プロフィール" 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <User size={20} className="text-gray-500" />
+          )}
         </div>
       </button>
     </div>

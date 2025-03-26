@@ -1,140 +1,188 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Barcode, StopCircle, X, Upload, AlertTriangle } from 'lucide-react';
+import { Barcode, StopCircle, X, AlertTriangle } from 'lucide-react';
 import Notification from './Notification';
-
-// react-zxingのインポートをtry-catchで囲む
-let ZXing: any = null;
-try {
-  // 動的にインポートしてエラーを防ぐ
-  ZXing = require('react-zxing');
-} catch (error) {
-  console.warn('ZXing library could not be loaded:', error);
-}
+import { useZxing } from 'react-zxing';
+import BulkUploadModal from './BulkUploadModal';
 
 interface RegisterItemProps {
   userEmail?: string | null;
   isAuthenticated?: boolean;
   setAuthModalMode?: (mode: 'signin' | 'signup') => void;
   setIsAuthModalOpen?: (isOpen: boolean) => void;
+  setCsvData?: (data: any[]) => void;
 }
 
-interface Notification {
-  show: boolean;
-  message: string;
-  type: 'success' | 'error' | 'info';
+interface FormData {
+  barcode: string;
+  itemName: string;
+  genre: string;
+  customGenre: string;
+  manager: string;
+  customManager: string;
+  image: File | null;
 }
 
-const RegisterItem: React.FC<RegisterItemProps> = ({ 
+const RegisterItem: React.FC<RegisterItemProps> = ({
   userEmail,
   isAuthenticated = false,
   setAuthModalMode,
-  setIsAuthModalOpen
+  setIsAuthModalOpen,
+  setCsvData
 }) => {
+  const navigate = useNavigate();
   const [isScanning, setIsScanning] = useState(false);
-  const [scannedItem, setScannedItem] = useState('');
-  const [itemName, setItemName] = useState('');
-  const [selectedGenreId, setSelectedGenreId] = useState('');
-  const [selectedManagerId, setSelectedManagerId] = useState('');
-  const [genres, setGenres] = useState<{ id: string; name: string }[]>([]);
-  const [managers, setManagers] = useState<{ id: string; name: string }[]>([]);
-  const [notification, setNotification] = useState<Notification>({
+  const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
     show: false,
     message: '',
-    type: 'info',
+    type: 'success'
   });
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [genres, setGenres] = useState<string[]>([]);
+  const [managers, setManagers] = useState<string[]>([]);
+  const [formData, setFormData] = useState<FormData>({
+    barcode: '',
+    itemName: '',
+    genre: '',
+    customGenre: '',
+    manager: '',
+    customManager: '',
+    image: null
+  });
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [scannerError, setScannerError] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [pendingSubmission, setPendingSubmission] = useState(false);
 
-  // ZXingライブラリが利用可能な場合のみ、参照を作成
-  const zxingRef = useRef<HTMLVideoElement>(null);
-  const zxingHook = ZXing ? ZXing.useZxing({
-    onDecodeResult(result: any) {
-      const scanned = result.getText();
-      setScannedItem(scanned);
+  // バーコードスキャナーの設定 - エラーハンドリングを追加
+  const { ref } = useZxing({
+    onDecodeResult(result) {
+      setFormData(prev => ({ ...prev, barcode: result.getText() }));
       setIsScanning(false);
     },
     paused: !isScanning,
-    onError: () => {
+    onError: (error) => {
+      console.error('Scanner error:', error);
       setScannerError(true);
+      setNotification({
+        show: true,
+        message: 'カメラへのアクセスができませんでした。設定を確認してください。',
+        type: 'error'
+      });
+    },
+    constraints: {
+      video: {
+        facingMode: 'environment'  // 背面カメラを優先使用
+      }
     }
-  }) : { ref: zxingRef };
-  
-  // ZXingが利用できなくても、参照だけは作っておく
-  const ref = zxingHook.ref;
+  });
 
-  useEffect(() => {
-    fetchGenres();
-    fetchManagers();
-  }, []);
-
-  const fetchGenres = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('genres')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setGenres(data || []);
-    } catch (error) {
-      console.error('Error fetching genres:', error);
-    }
+  // スキャン開始時にエラー状態をリセット
+  const startScanning = () => {
+    setScannerError(false);
+    setIsScanning(true);
   };
 
-  const fetchManagers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('managers')
-        .select('id, name')
-        .order('name');
+  useEffect(() => {
+    fetchExistingData();
+  }, []);
 
-      if (error) throw error;
-      setManagers(data || []);
+  useEffect(() => {
+    // 認証済みで、保留中のデータがある場合
+    if (isAuthenticated && pendingSubmission) {
+      // 保留中のフォーム送信を実行
+      const processPendingSubmission = async () => {
+        await handleRegisterItem();
+        // 処理後にフラグをリセット
+        setPendingSubmission(false);
+      };
+      
+      processPendingSubmission();
+    }
+    
+    // コンポーネントマウント時に保存データがあれば復元
+    const savedFormData = sessionStorage.getItem('pendingRegistrationData');
+    const hasPendingData = sessionStorage.getItem('hasPendingRegistration');
+    
+    if (savedFormData && hasPendingData === 'true') {
+      try {
+        const parsedData = JSON.parse(savedFormData);
+        setFormData(prevData => ({
+          ...prevData,
+          barcode: parsedData.barcode || '',
+          itemName: parsedData.itemName || '',
+          genre: parsedData.genre || '',
+          customGenre: parsedData.customGenre || '',
+          manager: parsedData.manager || '',
+          customManager: parsedData.customManager || ''
+          // 画像は復元できないのでnullのままにする
+        }));
+        
+        // 画像以外のデータが復元された場合に通知
+        if (parsedData.itemName) {
+          setNotification({
+            show: true,
+            message: '入力データを復元しました。画像は再度選択してください。',
+            type: 'success'
+          });
+        }
+        
+        // ログイン済みで保留中データがある場合はフラグをセット
+        if (isAuthenticated) {
+          setPendingSubmission(true);
+        }
+      } catch (e) {
+        console.error('Failed to parse saved form data:', e);
+      }
+    }
+  }, [isAuthenticated]); // isAuthenticatedの変更でチェック
+
+  const fetchExistingData = async () => {
+    try {
+      const { data: items } = await supabase
+        .from('items')
+        .select('genre, manager')
+        .eq('item_deleted', false);
+
+      if (items) {
+        const uniqueGenres = [...new Set(items.map(item => item.genre).filter(Boolean))];
+        const uniqueManagers = [...new Set(items.map(item => item.manager).filter(Boolean))];
+        setGenres(uniqueGenres);
+        setManagers(uniqueManagers);
+      }
     } catch (error) {
-      console.error('Error fetching managers:', error);
+      console.error('Error fetching existing data:', error);
     }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      setFormData(prev => ({ ...prev, image: selectedFile }));
       
-      // 画像プレビューの作成
+      // 画像プレビューを作成
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(selectedFile);
     }
   };
 
-  const uploadImage = async (): Promise<string | null> => {
-    if (!selectedImage) return null;
-
-    try {
-      const fileExt = selectedImage.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `items/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('images')
-        .upload(filePath, selectedImage);
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      return null;
-    }
+  // リセット時にプレビューもクリア
+  const resetForm = () => {
+    setFormData({
+      barcode: '',
+      itemName: '',
+      genre: '',
+      customGenre: '',
+      manager: '',
+      customManager: '',
+      image: null
+    });
+    setImagePreview(null);
+    sessionStorage.removeItem('pendingRegistrationData');
+    sessionStorage.removeItem('hasPendingRegistration');
   };
 
   // ログインを促す関数
@@ -146,309 +194,443 @@ const RegisterItem: React.FC<RegisterItemProps> = ({
     }
   };
 
-  // 登録処理 - 認証状態に応じて異なる動作
-  const handleRegister = async () => {
-    // 非ログイン状態ではログインモーダルを表示
-    if (!isAuthenticated) {
-      promptLogin('物品を登録するにはログインしてください');
-      return;
-    }
-
-    // 以下は認証済みユーザーの場合の処理
-    if (!itemName) {
-      showNotification('物品名を入力してください', 'error');
-      return;
+  const handleRegisterItem = async () => {
+    if (!formData.image) {
+      setNotification({
+        show: true,
+        message: '画像を選択してください',
+        type: 'error'
+      });
+      return false;
     }
 
     try {
-      let imageUrl = null;
-      if (selectedImage) {
-        imageUrl = await uploadImage();
+      // バーコードの重複チェック
+      if (formData.barcode) {
+        const { data: existingItem } = await supabase
+          .from('items')
+          .select('item_id')
+          .eq('item_id', formData.barcode)
+          .eq('item_deleted', false)
+          .single();
+
+        if (existingItem) {
+          setNotification({
+            show: true,
+            message: '既にデータが登録されています',
+            type: 'error'
+          });
+          return false;
+        }
       }
 
-      const { data, error } = await supabase.from('items').insert([
-        {
-          item_id: scannedItem || null,
-          name: itemName,
-          genre_id: selectedGenreId || null,
-          manager_id: selectedManagerId || null,
+      const file = formData.image;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('items')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('items')
+        .getPublicUrl(filePath);
+
+      const finalGenre = formData.genre === 'その他' ? formData.customGenre : formData.genre;
+      const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
+
+      const { error: insertError } = await supabase
+        .from('items')
+        .insert({
+          item_id: formData.barcode || null,
+          name: formData.itemName,
+          image: publicUrl,
+          genre: finalGenre,
+          manager: finalManager,
           registered_by: userEmail,
-          image: imageUrl,
-        },
-      ]);
+          registered_date: new Date().toISOString()
+        });
 
-      if (error) throw error;
+      if (insertError) {
+        throw insertError;
+      }
 
-      showNotification('物品が登録されました', 'success');
+      // 成功時の処理
+      setNotification({
+        show: true,
+        message: '登録が完了しました',
+        type: 'success'
+      });
+
+      // 保存済みデータを削除
+      sessionStorage.removeItem('pendingRegistrationData');
+      sessionStorage.removeItem('hasPendingRegistration');
+
+      // フォームとプレビューをリセット
       resetForm();
+
+      // 新しいデータを反映するために既存データを再取得
+      fetchExistingData();
+      
+      return true;
     } catch (error) {
-      console.error('Error registering item:', error);
-      showNotification('物品の登録に失敗しました', 'error');
+      console.error('Error submitting form:', error);
+      setNotification({
+        show: true,
+        message: 'エラーが発生しました',
+        type: 'error'
+      });
+      return false;
     }
   };
 
-  // CSV一括登録ボタンを押したときの処理
-  const handleCsvRegister = () => {
+  // 登録処理
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 非ログイン状態ではデータを保存してログインモーダルを表示
+    if (!isAuthenticated) {
+      // 画像以外のデータをセッションストレージに保存
+      const dataToSave = {
+        barcode: formData.barcode,
+        itemName: formData.itemName,
+        genre: formData.genre,
+        customGenre: formData.customGenre,
+        manager: formData.manager,
+        customManager: formData.customManager
+      };
+      
+      sessionStorage.setItem('pendingRegistrationData', JSON.stringify(dataToSave));
+      sessionStorage.setItem('hasPendingRegistration', 'true');
+      
+      // ユーザーに通知
+      setNotification({
+        show: true,
+        message: 'ログイン後に登録を完了します。画像は再度選択する必要があります。',
+        type: 'success'
+      });
+      
+      // ログインモーダルを表示
+      if (setAuthModalMode && setIsAuthModalOpen) {
+        setAuthModalMode('signin');
+        setIsAuthModalOpen(true);
+      }
+      
+      return;
+    }
+
+    // ログイン済みの場合は通常の登録処理
+    await handleRegisterItem();
+  };
+
+  const handleBulkUpload = async (file: File) => {
     if (!isAuthenticated) {
       promptLogin('CSVで一括登録するにはログインしてください');
       return;
     }
-    
-    // 認証済みの場合はCSV検証ページへ移動
-    window.location.href = '/csv-validation';
-  };
 
-  const resetForm = () => {
-    setScannedItem('');
-    setItemName('');
-    setSelectedGenreId('');
-    setSelectedManagerId('');
-    setSelectedImage(null);
-    setPreviewUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const rows = text.split('\n');
 
-  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
-    setNotification({
-      show: true,
-      message,
-      type,
-    });
+        // Filter out empty rows and parse CSV
+        const items = rows
+          .filter(row => row.trim()) // Skip empty rows
+          .map(row => {
+            const [item_id, name, genre, manager] = row.split(',').map(field => field.trim());
+            return {
+              item_id: item_id || '',
+              name: name || '',
+              genre: genre || '',
+              manager: manager || '',
+              isValid: false,
+              errors: []
+            };
+          });
 
-    // 3秒後に通知を非表示にする
-    setTimeout(() => {
-      setNotification((prev) => ({ ...prev, show: false }));
-    }, 3000);
+        // Remove header row if it exists
+        if (items.length > 0 && items[0].item_id === 'item_id') {
+          items.shift();
+        }
+
+        if (setCsvData) {
+          setCsvData(items);
+        }
+        setShowBulkUploadModal(false);
+        navigate('/csv-validation');
+      } catch (error) {
+        console.error('Error parsing CSV:', error);
+        setNotification({
+          show: true,
+          message: 'CSVファイルの解析中にエラーが発生しました',
+          type: 'error'
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const downloadCsvTemplate = () => {
-    const headers = 'item_id,name,genre,manager\n';
-    const sampleData = 'XYZ123,サンプル物品,電子機器,鈴木\n';
-    const csvContent = headers + sampleData;
-    
+    const csvContent = "item_id,name,genre,manager\n4912345678984,サンプル商品,サンプルジャンル,サンプル管理者\n";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'items_template.csv');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'sample.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // スキャン機能の開始
-  const startScanning = () => {
-    if (!ZXing) {
-      showNotification('バーコードスキャン機能を読み込めませんでした。手動で入力してください。', 'error');
-      return;
-    }
-    setIsScanning(true);
-    setScannerError(false);
+  // 手動でバーコードを入力する - 数字のみの入力に制限
+  const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 数字以外の文字を取り除く
+    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+    setFormData(prev => ({ ...prev, barcode: numericValue }));
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <>
       {notification.show && (
         <Notification
           message={notification.message}
           type={notification.type}
-          onClose={() => setNotification((prev) => ({ ...prev, show: false }))}
+          onClose={() => setNotification(prev => ({ ...prev, show: false }))}
         />
       )}
 
-      <h2 className="text-xl font-semibold mb-6">物品登録</h2>
+      {/* 白い背景の範囲を限定するよう修正 */}
+      <div className="bg-white w-full p-6"> {/* min-h-screen を削除 */}
+        <h2 className="text-xl font-semibold mb-6">物品登録</h2>
 
-      <div className="mb-6">
-        <div className="flex gap-2 mb-4">
-          {isScanning ? (
+        <div className="mb-6 border p-4 rounded-md">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            バーコード
+          </label>
+          <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
+            {/* ボタンを左側に移動 */}
             <button
-              onClick={() => setIsScanning(false)}
-              className="flex items-center gap-2 px-4 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors"
+              type="button"
+              onClick={() => isScanning ? setIsScanning(false) : startScanning()}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-md w-full sm:w-auto ${
+                isScanning
+                  ? 'bg-red-500 hover:bg-red-600'
+                  : 'bg-blue-500 hover:bg-blue-600'
+              } text-white transition-colors whitespace-nowrap order-2 sm:order-1`}
+              aria-live="polite"
             >
-              <StopCircle size={20} />
-              Stop Scanning
+              {isScanning ? (
+                <>
+                  <StopCircle size={20} />
+                  スキャン停止
+                </>
+              ) : (
+                <>
+                  <Barcode size={20} />
+                  スキャン開始
+                </>
+              )}
             </button>
-          ) : (
-            <button
-              onClick={startScanning}
-              className="flex items-center gap-2 px-4 py-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-            >
-              <Barcode size={20} />
-              Start Scanning
-            </button>
+            
+            {/* 入力フィールドを右側に移動 - 数字のみの入力に制限 */}
+            <div className="w-full order-1 sm:order-2 relative">
+              <input
+                type="text"
+                inputMode="numeric" // モバイルで数字キーボードを表示
+                pattern="[0-9]*" // 数字のみ許可
+                value={formData.barcode}
+                onChange={handleBarcodeInput}
+                className="w-full border border-gray-300 rounded-md p-2 flex-grow"
+                placeholder="スキャンするか手動で入力"
+                aria-label="バーコード入力"
+              />
+              {/* 桁数カウンターを右下に表示 */}
+              <div className="absolute bottom-1 right-2 text-xs text-gray-500">
+                {formData.barcode.length}
+              </div>
+            </div>
+          </div>
+
+          {/* スキャナー表示エリア - 左寄せに変更 */}
+          {isScanning && (
+            <div className="relative w-full max-w-md aspect-video mb-4 rounded-lg overflow-hidden border-2 border-blue-500">
+              {scannerError ? (
+                <div className="h-full w-full flex flex-col items-center justify-center bg-gray-100 p-4">
+                  <AlertTriangle size={48} className="text-red-500 mb-2" />
+                  <p className="text-red-500 font-medium text-center">カメラへのアクセスができませんでした</p>
+                  <p className="text-sm text-gray-600 mt-2 text-center">ブラウザの設定でカメラのアクセス許可を確認してください</p>
+                  <p className="text-sm text-gray-600 mt-1 text-center">または下のバーコード入力欄に手動で入力してください</p>
+                </div>
+              ) : (
+                <video 
+                  ref={ref as React.RefObject<HTMLVideoElement>} 
+                  className="w-full h-full object-cover" 
+                />
+              )}
+            </div>
           )}
         </div>
 
-        {isScanning && ZXing && (
-          <div className="relative mb-4">
-            <div className="absolute top-2 right-2 z-10">
-              <button
-                onClick={() => setIsScanning(false)}
-                className="bg-white p-1 rounded-full shadow-md"
-              >
-                <X size={24} className="text-gray-700" />
-              </button>
-            </div>
-            <div className="overflow-hidden rounded-lg border-2 border-blue-500 w-full h-64">
-              {scannerError ? (
-                <div className="h-full w-full flex flex-col items-center justify-center bg-gray-100">
-                  <AlertTriangle size={48} className="text-red-500 mb-2" />
-                  <p className="text-red-500 font-medium">カメラへのアクセスができませんでした</p>
-                  <p className="text-sm text-gray-600 mt-2">ブラウザの設定でカメラのアクセス許可を確認してください</p>
-                </div>
-              ) : (
-                <video ref={ref} className="w-full h-full object-cover" />
-              )}
-            </div>
-            <div className="mt-2 text-sm text-gray-600">バーコードをスキャナーに合わせてください</div>
-          </div>
-        )}
-
-        {isScanning && !ZXing && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="h-5 w-5 text-yellow-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  バーコードスキャン機能が利用できません。手動でバーコードを入力してください。
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleRegister(); }}>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            バーコード
-          </label>
-          <input
-            type="text"
-            value={scannedItem}
-            onChange={(e) => setScannedItem(e.target.value)}
-            className="w-full border border-gray-300 rounded-md p-2"
-            placeholder="バーコードをスキャンしてください"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            画像アップロード
-          </label>
-          <div className="flex items-start gap-4">
-            <div className="flex-1">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="image-upload" className="block text-sm font-medium text-gray-700 mb-1">
+              画像 <span className="text-red-500">*必須</span>
+            </label>
+            
+            <div className="mb-2">
               <input
+                id="image-upload"
                 type="file"
-                accept="image/*"
-                className="w-full border border-gray-300 rounded-md p-2"
+                accept="image/jpeg, image/png, image/gif, image/webp"
                 onChange={handleImageChange}
-                ref={fileInputRef}
+                className="w-full border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                required
               />
             </div>
-            {previewUrl && (
-              <div className="h-20 w-20 rounded-lg overflow-hidden flex-shrink-0 relative">
-                <img 
-                  src={previewUrl} 
-                  alt="プレビュー" 
-                  className="h-full w-full object-cover" 
-                />
+            
+            {/* 画像プレビュー表示 - アスペクト比を維持するように修正 */}
+            {imagePreview && (
+              <div className="mt-2 relative inline-block">
+                <div className="relative bg-gray-100 border rounded-md p-2" style={{ maxWidth: '250px' }}>
+                  <img 
+                    src={imagePreview} 
+                    alt="画像プレビュー" 
+                    className="max-h-48 object-contain" // object-cover から object-contain に変更
+                    style={{ maxWidth: '100%', display: 'block' }} // 幅を親要素に合わせつつ、高さは自動調整
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedImage(null);
-                    setPreviewUrl(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    setImagePreview(null);
+                    setFormData(prev => ({ ...prev, image: null }));
                   }}
-                  className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-bl-md"
+                  className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100"
+                  aria-label="プレビューを削除"
                 >
-                  <X size={16} />
+                  <X size={16} className="text-gray-600" />
                 </button>
               </div>
             )}
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            物品名
-          </label>
-          <input
-            type="text"
-            value={itemName}
-            onChange={(e) => setItemName(e.target.value)}
-            className="w-full border border-gray-300 rounded-md p-2"
-            placeholder="物品名を入力"
-          />
-        </div>
+          <div>
+            <label htmlFor="item-name" className="block text-sm font-medium text-gray-700 mb-1">
+              物品名 <span className="text-red-500">*必須</span>
+            </label>
+            <input
+              id="item-name"
+              type="text"
+              value={formData.itemName}
+              onChange={(e) => setFormData(prev => ({ ...prev, itemName: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            ジャンル
-          </label>
-          <select
-            value={selectedGenreId}
-            onChange={(e) => setSelectedGenreId(e.target.value)}
-            className="w-full border border-gray-300 rounded-md p-2 mb-2"
-          >
-            <option value="">選択してください</option>
-            {genres.map((genre) => (
-              <option key={genre.id} value={genre.id}>
-                {genre.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="genre-select" className="block text-sm font-medium text-gray-700 mb-1">
+              ジャンル <span className="text-red-500">*必須</span>
+            </label>
+            <select
+              id="genre-select"
+              value={formData.genre}
+              onChange={(e) => setFormData(prev => ({ ...prev, genre: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md p-2 mb-2 bg-white"
+              required
+            >
+              <option value="">選択してください</option>
+              {genres.map(genre => (
+                <option key={genre} value={genre}>{genre}</option>
+              ))}
+              <option value="その他">その他 (自由入力)</option>
+            </select>
+            {formData.genre === 'その他' && (
+              <input
+                type="text"
+                value={formData.customGenre}
+                onChange={(e) => setFormData(prev => ({ ...prev, customGenre: e.target.value }))}
+                placeholder="ジャンルを入力"
+                className="w-full border border-gray-300 rounded-md p-2"
+                required
+              />
+            )}
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            管理者
-          </label>
-          <select
-            value={selectedManagerId}
-            onChange={(e) => setSelectedManagerId(e.target.value)}
-            className="w-full border border-gray-300 rounded-md p-2 mb-2"
-          >
-            <option value="">選択してください</option>
-            {managers.map((manager) => (
-              <option key={manager.id} value={manager.id}>
-                {manager.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="manager-select" className="block text-sm font-medium text-gray-700 mb-1">
+              管理者 <span className="text-red-500">*必須</span>
+            </label>
+            <select
+              id="manager-select"
+              value={formData.manager}
+              onChange={(e) => setFormData(prev => ({ ...prev, manager: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md p-2 mb-2 bg-white"
+              required
+            >
+              <option value="">選択してください</option>
+              {managers.map(manager => (
+                <option key={manager} value={manager}>{manager}</option>
+              ))}
+              <option value="その他">その他 (自由入力)</option>
+            </select>
+            {formData.manager === 'その他' && (
+              <input
+                type="text"
+                value={formData.customManager}
+                onChange={(e) => setFormData(prev => ({ ...prev, customManager: e.target.value }))}
+                placeholder="管理者名を入力"
+                className="w-full border border-gray-300 rounded-md p-2"
+                required
+              />
+            )}
+          </div>
 
-        <div className="flex gap-4">
-          <button
-            type="button"
-            onClick={handleRegister}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
-          >
-            登録
-          </button>
-          <button
-            type="button"
-            onClick={handleCsvRegister}
-            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-md transition-colors"
-          >
-            CSVで一括登録
-          </button>
-        </div>
-      </form>
-
-      <div className="mt-6 text-right">
-        <button
-          className="text-sm text-blue-500 hover:text-blue-600"
-          onClick={downloadCsvTemplate}
-        >
-          CSVのサンプルをダウンロード
-        </button>
+          {/* フォームの送信ボタン部分を条件分岐で修正 */}
+          <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center">
+            <button
+              type="submit"
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors order-1 w-full sm:w-auto"
+            >
+              登録する
+            </button>
+            
+            {/* ログイン済みの場合のみCSV関連ボタンを表示 */}
+            {isAuthenticated && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkUploadModal(true)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md transition-colors order-2 w-full sm:w-auto"
+                >
+                  CSVで一括登録
+                </button>
+                <button
+                  type="button"
+                  className="text-sm text-blue-500 hover:text-blue-700 order-3 mt-2 sm:mt-0 sm:ml-auto"
+                  onClick={downloadCsvTemplate}
+                >
+                  CSVテンプレートDL
+                </button>
+              </>
+            )}
+          </div>
+        </form> 
       </div>
-    </div>
+
+      {showBulkUploadModal && (
+        <BulkUploadModal
+          onClose={() => setShowBulkUploadModal(false)}
+          onUpload={handleBulkUpload}
+        />
+      )}
+    </>
   );
 };
 

@@ -9,14 +9,22 @@ interface AuthFormData {
   phoneNumber?: string;
 }
 
+// AuthModalコンポーネントの型定義を修正
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (userName: string) => void;
-  initialMode?: 'signin' | 'signup';
+  onAuthSuccess: (email: string, name?: string) => void;
+  initialMode: 'signin' | 'signup';
+  setMode: (mode: 'signin' | 'signup') => void; // setModeプロパティを追加
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess, initialMode = 'signin' }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onAuthSuccess, 
+  initialMode, 
+  setMode 
+}) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
   const [authFormData, setAuthFormData] = useState<AuthFormData>({
     email: '',
@@ -121,7 +129,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess, i
         const userName = data.user?.user_metadata?.name || 
                          data.user?.user_metadata?.full_name || 
                          data.user?.email?.split('@')[0] || 'ゲスト';
-        onAuthSuccess(userName);
+        onAuthSuccess(authFormData.email, userName);
         
       } else {
         // サインアップ処理
@@ -141,7 +149,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess, i
         // 登録時は入力された名前を使用
         const userName = authFormData.name || 
                          data.user?.email?.split('@')[0] || 'ゲスト';
-        onAuthSuccess(userName);
+        onAuthSuccess(authFormData.email, userName);
       }
       
       onClose();

@@ -22,9 +22,9 @@ interface LayoutProps {
   isAuthenticated: boolean;
   setShowAuthModal: (show: boolean) => void;
   setAuthMode: (mode: 'signin' | 'signup') => void;
-  userEmail: string | null;
-  setIsAuthenticated: (isAuthenticated: boolean) => void;
-  userProfileImage?: string | null; // プロフィール画像URLを追加
+  userEmail?: string | null;
+  setIsAuthenticated?: (isAuthenticated: boolean) => void;
+  userProfileImage?: string | null; // プロフィール画像URL
 }
 
 export default function Layout({
@@ -34,7 +34,7 @@ export default function Layout({
   setAuthMode,
   userEmail,
   setIsAuthenticated,
-  userProfileImage, // 新しいプロパティを追加
+  userProfileImage,
 }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -42,10 +42,17 @@ export default function Layout({
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // ユーザーの名前とプロフィール画像を取得
+  // ログインが必要な機能をクリックしたときの共通処理
+  const handleAuthRequired = () => {
+    // アラートを表示せず、直接ログインモーダルを表示
+    setAuthMode('signin');
+    setShowAuthModal(true);
+  };
+
+  // ユーザーの名前とプロフィール画像を取得 (認証済みの場合のみ)
   useEffect(() => {
     const fetchUserInfo = async () => {
-      if (isAuthenticated) {
+      if (isAuthenticated && userEmail) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
@@ -60,8 +67,8 @@ export default function Layout({
             
             // プロフィール画像を取得（Googleのavatar_urlなど）
             const avatarUrl = user.user_metadata?.avatar_url || 
-                             user.user_metadata?.picture || 
-                             userProfileImage;
+                            user.user_metadata?.picture || 
+                            userProfileImage;
             
             if (avatarUrl) {
               // 既にpropsからuserProfileImageが渡されていれば、それを優先して使う
@@ -84,6 +91,8 @@ export default function Layout({
   }, [isAuthenticated, userEmail, userProfileImage]);
 
   const handleLogout = async () => {
+    if (!setIsAuthenticated) return;
+    
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -124,11 +133,6 @@ export default function Layout({
     }
   };
 
-  // サイドバートグルを処理
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* ヘッダー */}
@@ -136,7 +140,7 @@ export default function Layout({
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             <button 
-              onClick={toggleSidebar} 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
               className="text-gray-500 hover:text-gray-700 md:hidden mr-3"
             >
               <Menu size={24} />
@@ -149,56 +153,56 @@ export default function Layout({
           </div>
           
           {/* ユーザー情報 */}
-<div className="flex items-center">
-  {isAuthenticated ? (
-    <div className="relative flex items-center">
-      <button 
-        onClick={() => setShowLogoutModal(true)}
-        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
-      >
-        <span className="font-medium truncate max-w-[120px]">
-          {userName || userEmail?.split('@')[0] || 'ゲスト'}
-        </span>
-        
-        {/* ユーザーアイコン - プロフィール画像があれば表示、なければデフォルトアイコン */}
-        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-          {userProfileImage ? (
-            <img 
-              src={userProfileImage} 
-              alt="プロフィール" 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <User size={20} className="text-gray-500" />
-          )}
-        </div>
-      </button>
-    </div>
-  ) : (
-    <div className="flex gap-2">
-      <button 
-        onClick={() => {
-          setAuthMode('signin');
-          setShowAuthModal(true);
-        }}
-        className="flex items-center text-sm text-gray-600 hover:text-gray-800"
-      >
-        <LogIn size={16} className="mr-1" />
-        <span className="hidden sm:inline">ログイン</span>
-      </button>
-      <button 
-        onClick={() => {
-          setAuthMode('signup');
-          setShowAuthModal(true);
-        }}
-        className="flex items-center text-sm text-gray-600 hover:text-gray-800"
-      >
-        <UserPlus size={16} className="mr-1" />
-        <span className="hidden sm:inline">会員登録</span>
-      </button>
-    </div>
-  )}
-</div>
+          <div className="flex items-center">
+            {isAuthenticated ? (
+              <div className="relative flex items-center">
+                <button 
+                  onClick={() => setShowLogoutModal(true)}
+                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
+                >
+                  <span className="font-medium truncate max-w-[120px]">
+                    {userName || userEmail?.split('@')[0] || 'ゲスト'}
+                  </span>
+                  
+                  {/* ユーザーアイコン - プロフィール画像があれば表示、なければデフォルトアイコン */}
+                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                    {userProfileImage ? (
+                      <img 
+                        src={userProfileImage} 
+                        alt="プロフィール" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User size={20} className="text-gray-500" />
+                    )}
+                  </div>
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setShowAuthModal(true);
+                  }}
+                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                >
+                  <LogIn size={16} className="mr-1" />
+                  <span className="hidden sm:inline">ログイン</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setShowAuthModal(true);
+                  }}
+                  className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                >
+                  <UserPlus size={16} className="mr-1" />
+                  <span className="hidden sm:inline">会員登録</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* パンくずリスト - PC・スマホ両方で表示 */}
@@ -212,7 +216,7 @@ export default function Layout({
       </div>
 
       <div className="flex flex-1">
-        {/* サイドバー */}
+        {/* サイドバー - 共通化 */}
         <div className={`
           bg-white shadow-sm fixed inset-y-0 left-0 z-30 w-64 transform transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -220,7 +224,7 @@ export default function Layout({
         `}>
           {/* スマホ用閉じるボタン */}
           <div className="px-4 py-3 flex justify-between items-center border-b md:hidden">
-            <h1 className="text-xl font-semibold text-gray-800">在庫管理</h1>
+            <h1 className="text-xl font-semibold text-gray-800">メニュー</h1>
             <button 
               onClick={() => setIsSidebarOpen(false)}
               className="text-gray-500 hover:text-gray-700"
@@ -229,9 +233,9 @@ export default function Layout({
             </button>
           </div>
           
-          {/* サイドバーコンテンツ */}
+          {/* サイドバーコンテンツ - ログイン状態に関わらず全て表示 */}
           <div className="py-4">
-            {/* メニューアイテム */}
+            {/* 物品管理メニュー */}
             <div className="px-4 mb-6">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                 物品管理
@@ -244,93 +248,211 @@ export default function Layout({
                   <Barcode className="mr-3" size={20} />
                   <span>物品登録</span>
                 </Link>
-                <Link 
-                  to="/items"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/items' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <LayoutList className="mr-3" size={20} />
-                  <span>物品一覧</span>
-                </Link>
+                
+                {isAuthenticated ? (
+                  <Link 
+                    to="/items"
+                    className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/items' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    <LayoutList className="mr-3" size={20} />
+                    <span>物品一覧</span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleAuthRequired}
+                    className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                  >
+                    <LayoutList className="mr-3" size={20} />
+                    <span className="flex items-center">
+                      <span>物品一覧</span>
+                      <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                    </span>
+                  </button>
+                )}
               </nav>
             </div>
             
+            {/* イベントメニュー */}
             <div className="px-4 mb-6">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                 イベント
               </div>
               <nav className="space-y-1">
-                <Link 
-                  to="/events/register"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <Home className="mr-3" size={20} />
-                  <span>イベント登録</span>
-                </Link>
-                <Link 
-                  to="/events"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <LayoutList className="mr-3" size={20} />
-                  <span>イベント一覧</span>
-                </Link>
-                <Link 
-                  to="/daily-registration"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <Barcode className="mr-3" size={20} />
-                  <span>当日物品登録</span>
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <Link 
+                      to="/events/register"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <Home className="mr-3" size={20} />
+                      <span>イベント登録</span>
+                    </Link>
+                    <Link 
+                      to="/events"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <LayoutList className="mr-3" size={20} />
+                      <span>イベント一覧</span>
+                    </Link>
+                    <Link 
+                      to="/daily-registration"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <Barcode className="mr-3" size={20} />
+                      <span>当日物品登録</span>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <Home className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>イベント登録</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <LayoutList className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>イベント一覧</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <Barcode className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>当日物品登録</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                  </>
+                )}
               </nav>
             </div>
             
+            {/* 貸出管理メニュー */}
             <div className="px-4 mb-6">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                 貸出管理
               </div>
               <nav className="space-y-1">
-                <Link 
-                  to="/loan-management"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <CreditCard className="mr-3" size={20} />
-                  <span>貸出管理</span>
-                </Link>
-                <Link 
-                  to="/loan-history"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-history' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <History className="mr-3" size={20} />
-                  <span>貸出履歴</span>
-                </Link>
-                <Link 
-                  to="/loan-statistics"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <BarChart className="mr-3" size={20} />
-                  <span>貸出統計</span>
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <Link 
+                      to="/loan-management"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <CreditCard className="mr-3" size={20} />
+                      <span>貸出管理</span>
+                    </Link>
+                    <Link 
+                      to="/loan-history"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-history' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <History className="mr-3" size={20} />
+                      <span>貸出履歴</span>
+                    </Link>
+                    <Link 
+                      to="/loan-statistics"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <BarChart className="mr-3" size={20} />
+                      <span>貸出統計</span>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <CreditCard className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>貸出管理</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <History className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>貸出履歴</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <BarChart className="mr-3" size={20} />
+                      <span className="flex items-center">
+                        <span>貸出統計</span>
+                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
+                      </span>
+                    </button>
+                  </>
+                )}
               </nav>
             </div>
             
+            {/* アカウントメニュー */}
             <div className="px-4">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                 アカウント
               </div>
               <nav className="space-y-1">
-                <Link 
-                  to="/profile"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <User className="mr-3" size={20} />
-                  <span>プロフィール</span>
-                </Link>
-                <button 
-                  onClick={() => setShowLogoutModal(true)}
-                  className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
-                >
-                  <LogOut className="mr-3" size={20} /> {/* Settingsから適切なLogOutアイコンに変更 */}
-                  <span>ログアウト</span>
-                </button>
+                {isAuthenticated ? (
+                  <>
+                    <Link 
+                      to="/profile"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <User className="mr-3" size={20} />
+                      <span>プロフィール</span>
+                    </Link>
+                    <button 
+                      onClick={() => setShowLogoutModal(true)}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogOut className="mr-3" size={20} />
+                      <span>ログアウト</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setAuthMode('signin');
+                        setShowAuthModal(true);
+                      }}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogIn className="mr-3" size={20} />
+                      <span>ログイン</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setAuthMode('signup');
+                        setShowAuthModal(true);
+                      }}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      <UserPlus className="mr-3" size={20} />
+                      <span>会員登録</span>
+                    </button>
+                  </>
+                )}
               </nav>
             </div>
           </div>

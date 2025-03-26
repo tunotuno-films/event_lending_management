@@ -54,7 +54,14 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-export default function CsvValidation({ csvData }: { csvData: CsvItem[] }) {
+// CsvValidationコンポーネントの型定義
+interface CsvValidationProps {
+  csvData: CsvItem[];
+  setCsvData: React.Dispatch<React.SetStateAction<CsvItem[]>>;
+  userEmail: string | null;
+}
+
+const CsvValidation: React.FC<CsvValidationProps> = ({ csvData, setCsvData, userEmail }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState<CsvItem[]>([]);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
@@ -271,4 +278,6 @@ export default function CsvValidation({ csvData }: { csvData: CsvItem[] }) {
       </div>
     </div>
   );
-}
+};
+
+export default CsvValidation;

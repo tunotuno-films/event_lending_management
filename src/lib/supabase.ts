@@ -243,21 +243,31 @@ export const safelyFetchData = async (tableName: string, query = {}) => {
   }
 };
 
-// Google認証からのリダイレクト処理を追加
+// Google認証からのリダイレクト処理を修正
 export const handleAuthRedirect = async () => {
   const { data, error } = await supabase.auth.getSession();
   
-  // URLからハッシュパラメータを取得
-  const hashParams = window.location.hash;
-  if (hashParams && (hashParams.includes('access_token') || hashParams.includes('error'))) {
-    // セッション確立を試みる
-    const { data, error } = await supabase.auth.getSession();
+  // OAuthのリダイレクト処理
+  // セッション確立を試みる
+  try {
+    // Supabaseの内部リダイレクト処理を実行（プラグイン等を起動する可能性あり）
+    const { data: authData, error: authError } = await supabase.auth.getSession();
+    
+    // エラーログを出力（デバッグ用）
+    if (authError) {
+      console.error('Auth redirect error:', authError);
+    }
     
     // URLからハッシュを削除（クリーンアップ）
-    window.history.replaceState(null, '', window.location.pathname);
+    if (window.location.hash.includes('access_token') || 
+        window.location.hash.includes('error') || 
+        window.location.hash.includes('type=recovery')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     
-    return { data, error };
+    return { data: authData, error: authError };
+  } catch (err) {
+    console.error('Error handling redirect:', err);
+    return { data, error: err as any };
   }
-  
-  return { data, error };
 };

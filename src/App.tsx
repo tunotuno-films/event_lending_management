@@ -631,20 +631,21 @@ function App() {
   // パスワードの強度を計算
   const passwordStrength = calculatePasswordStrength(authFormData.password);
 
-  // Google認証ハンドラを追加
+  // Google認証ハンドラを修正
   const handleGoogleAuth = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin + window.location.pathname,
+          // 以下のオプションを追加
+          queryParams: {
+            prompt: 'select_account'
+          }
         }
       });
       
       if (error) throw error;
-      
-      // Googleログインはリダイレクトベースなので、
-      // このコードの後はリダイレクトが発生します
     } catch (error) {
       console.error('Google authentication error:', error);
       alert('Google認証エラーが発生しました');

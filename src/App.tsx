@@ -94,6 +94,25 @@ function AppContents() {
     };
   }, []);
 
+  // プロフィール画像が更新されたとき
+  useEffect(() => {
+    const handleProfileImageUpdate = (event: CustomEvent<{ profileImageUrl: string }>) => {
+      const { profileImageUrl } = event.detail;
+      if (profileImageUrl && profileImageUrl !== userProfileImage) {
+        setUserProfileImage(profileImageUrl);
+        console.log('Updated profile image from auth provider:', profileImageUrl);
+      }
+    };
+
+    // カスタムイベントをリッスン
+    window.addEventListener('userProfileImageUpdated', handleProfileImageUpdate as EventListener);
+
+    // クリーンアップ関数
+    return () => {
+      window.removeEventListener('userProfileImageUpdated', handleProfileImageUpdate as EventListener);
+    };
+  }, [userProfileImage]);
+
   // ウェルカムアニメーション表示制御
   const displayWelcomeAnimation = () => {
     setShowWelcomeAnimation(true);
@@ -144,12 +163,12 @@ function AppContents() {
           <div className="animate-scale-up text-center px-4">
             <div className="hidden sm:flex items-center justify-center space-x-3">
               <span className="text-5xl font-bold text-white">ようこそ</span>
-              <span className="text-5xl font-bold text-white">{welcomeUserName}</span>
-              <span className="text-5xl font-bold text-white">さん</span>
+              <span className="text-5xl font-bold text白">{welcomeUserName}</span>
+              <span className="text-5xl font-bold text白">さん</span>
             </div>
             <div className="flex flex-col items-center sm:hidden">
-              <span className="text-4xl font-bold text-white mb-2">ようこそ</span>
-              <span className="text-4xl font-bold text-white">{welcomeUserName}</span>
+              <span className="text-4xl font-bold text白 mb-2">ようこそ</span>
+              <span className="text-4xl font-bold text白">{welcomeUserName}</span>
               <span className="text-4xl font-bold text白">さん</span>
             </div>
           </div>

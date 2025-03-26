@@ -67,17 +67,18 @@ export default function Layout({
             
             // プロフィール画像を取得（Googleのavatar_urlなど）
             const avatarUrl = user.user_metadata?.avatar_url || 
-                            user.user_metadata?.picture || 
-                            userProfileImage;
+                            user.user_metadata?.picture;
             
-            if (avatarUrl) {
-              // 既にpropsからuserProfileImageが渡されていれば、それを優先して使う
-              // そうでなければ、user_metadataからの画像URLを使用
-              if (!userProfileImage) {
-                // 親コンポーネントでuserProfileImageが更新できるよう
-                // ここではコンソールに出力するだけ
-                console.log('Found user avatar in metadata:', avatarUrl);
-              }
+            // プロフィール画像がメタデータにあり、かつApp.tsxから渡されたものと異なる場合
+            if (avatarUrl && avatarUrl !== userProfileImage) {
+              // window オブジェクトにカスタムイベントを発火して親コンポーネントに通知
+              // これにより、App.tsx側でuserProfileImageを更新できる
+              const event = new CustomEvent('userProfileImageUpdated', { 
+                detail: { profileImageUrl: avatarUrl } 
+              });
+              window.dispatchEvent(event);
+              
+              console.log('Profile image found in metadata:', avatarUrl);
             }
           }
         } catch (error) {

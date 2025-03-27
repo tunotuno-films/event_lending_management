@@ -147,10 +147,25 @@ export default function DailyItemRegistration() {
     }
 
     try {
+      // ユーザーのメールアドレスを取得（Appから渡されるpropsやauthからの取得が必要）
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email;
+
+      if (!userEmail) {
+        setNotification({
+          show: true,
+          message: 'ユーザー情報が取得できません。再ログインしてください。',
+          type: 'error'
+        });
+        return;
+      }
+
+      // created_byフィールドを含める
       const controlRecords = selectedItems.map(itemId => ({
         event_id: selectedEventId,
         item_id: itemId,
-        status: false
+        status: false,
+        created_by: userEmail // ユーザーのメールアドレスを設定
       }));
 
       const { error } = await supabase
@@ -161,18 +176,16 @@ export default function DailyItemRegistration() {
 
       setNotification({
         show: true,
-        message: '物品を登録しました',
+        message: '登録が完了しました',
         type: 'success'
       });
 
-      // Reset selections and refresh available items
       setSelectedItems([]);
-      fetchAvailableItems();
     } catch (error) {
       console.error('Error registering items:', error);
       setNotification({
         show: true,
-        message: '登録中にエラーが発生しました',
+        message: 'エラーが発生しました',
         type: 'error'
       });
     }

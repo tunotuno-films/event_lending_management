@@ -157,7 +157,7 @@ export default function LoanHistory() {
     if (!selectedEventId) return;
 
     try {
-      // First, find records with less than 60 seconds between start and end
+      // 60秒未満の貸出を検出
       const shortLoans = loanRecords.filter(record => {
         if (!record.end_datetime) return false;
         const start = new Date(record.start_datetime).getTime();
@@ -175,7 +175,7 @@ export default function LoanHistory() {
         return;
       }
 
-      // Delete the records using a direct SQL query
+      // 削除実行
       const { error } = await supabase
         .from('result')
         .delete()
@@ -184,7 +184,7 @@ export default function LoanHistory() {
 
       if (error) throw error;
 
-      // Refresh the loan records to reflect the changes
+      // 記録を再取得
       await fetchLoanRecords();
 
       setNotification({

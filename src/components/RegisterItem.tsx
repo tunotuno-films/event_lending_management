@@ -305,7 +305,7 @@
             image: publicUrl,
             genre: finalGenre,
             manager: finalManager,
-            registered_by: userEmail,
+            registered_by: userEmail, // ユーザーのメールアドレスを確実に設定
             registered_date: new Date().toISOString()
             });
 

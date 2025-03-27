@@ -76,11 +76,16 @@ export default function RegisterEvent() {
         return;
       }
 
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const userEmail = user?.email;
+
       const { error } = await supabase
         .from('events')
         .insert({
           event_id: formData.eventId,
-          name: formData.name
+          name: formData.name,
+          created_by: userEmail  // ユーザーのメールアドレスを設定
         });
 
       if (error) throw error;

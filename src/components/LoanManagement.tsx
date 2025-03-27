@@ -184,6 +184,19 @@ export default function LoanManagement() {
       const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
       const jstDate = new Date(now);
 
+      // ユーザーのメールアドレスを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email;
+
+      if (!userEmail) {
+        setNotification({
+          show: true,
+          message: 'ユーザー情報が取得できません。再ログインしてください。',
+          type: 'error'
+        });
+        return;
+      }
+
       // Get the control record to access event_id and item_id
       const { data: controlData, error: controlError } = await supabase
         .from('control')
@@ -211,7 +224,8 @@ export default function LoanManagement() {
           .insert({
             event_id: controlData.event_id,
             item_id: controlData.item_id,
-            start_datetime: jstDate.toISOString()
+            start_datetime: jstDate.toISOString(),
+            created_by: userEmail // ユーザーのメールアドレスを設定
           });
 
         if (insertError) throw insertError;

@@ -16,6 +16,7 @@ import {
   User,
   ArrowUpRight, // 貸出用の新しいアイコン
   ArrowDownRight, // 返却用の新しいアイコン
+  Lock, // ログインが必要な場合のアイコン
 } from 'lucide-react';
 
 // 型定義の修正
@@ -372,114 +373,116 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           </div>
         ) : (
           <>
-            {/* 主要指標 - カード状でハイライト表示 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                      <Package className="h-6 w-6 text-white" aria-hidden="true" />
+            {/* 主要指標 - 認証済みユーザーにのみ表示 */}
+            {isAuthenticated && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                        <Package className="h-6 w-6 text-white" aria-hidden="true" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">登録物品数</dt>
+                          <dd className="flex items-baseline">
+                            <div className="text-2xl font-semibold text-gray-900">{stats.itemsCount}</div>
+                          </dd>
+                        </dl>
+                      </div>
                     </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">登録物品数</dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-2xl font-semibold text-gray-900">{stats.itemsCount}</div>
-                        </dd>
-                      </dl>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/item/list" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
+                        物品一覧を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                  <div className="text-sm">
-                    <Link to="/items" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
-                      物品一覧を見る
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
+                
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+                        <Calendar className="h-6 w-6 text-white" aria-hidden="true" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">イベント数</dt>
+                          <dd className="flex items-baseline">
+                            <div className="text-2xl font-semibold text-gray-900">{stats.eventsCount}</div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/event/list" className="font-medium text-indigo-600 hover:text-indigo-500 flex items-center">
+                        イベント一覧を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                        <Barcode className="h-6 w-6 text-white" aria-hidden="true" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">貸出中アイテム</dt>
+                          <dd className="flex items-baseline">
+                            <div className="text-2xl font-semibold text-gray-900">{stats.activeLoansCount}</div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/loaning/control" className="font-medium text-green-600 hover:text-green-500 flex items-center">
+                        貸出管理へ
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                        <History className="h-6 w-6 text-white" aria-hidden="true" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">累計貸出回数</dt>
+                          <dd className="flex items-baseline">
+                            <div className="text-2xl font-semibold text-gray-900">{stats.completedLoansCount}</div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/loaning/log" className="font-medium text-purple-600 hover:text-purple-500 flex items-center">
+                        貸出履歴を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
-                      <Calendar className="h-6 w-6 text-white" aria-hidden="true" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">イベント数</dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-2xl font-semibold text-gray-900">{stats.eventsCount}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                  <div className="text-sm">
-                    <Link to="/events" className="font-medium text-indigo-600 hover:text-indigo-500 flex items-center">
-                      イベント一覧を見る
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                      <Barcode className="h-6 w-6 text-white" aria-hidden="true" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">貸出中アイテム</dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-2xl font-semibold text-gray-900">{stats.activeLoansCount}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                  <div className="text-sm">
-                    <Link to="/loan-management" className="font-medium text-green-600 hover:text-green-500 flex items-center">
-                      貸出管理へ
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
-                      <History className="h-6 w-6 text-white" aria-hidden="true" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">累計貸出回数</dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-2xl font-semibold text-gray-900">{stats.completedLoansCount}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                  <div className="text-sm">
-                    <Link to="/loan-history" className="font-medium text-purple-600 hover:text-purple-500 flex items-center">
-                      貸出履歴を見る
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
             
-            {/* 主な機能へのショートカット */}
+            {/* 主な機能へのショートカット - 全てのユーザーに表示 */}
             <div className="bg-white shadow rounded-lg mb-8">
               <div className="px-4 py-5 sm:px-6">
                 <h2 className="text-lg font-medium text-gray-900">機能</h2>
@@ -630,16 +633,16 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
               </div>
             </div>
             
-            {/* データ可視化セクション */}
+            {/* データ可視化セクション - 人気物品ランキングと最近のアクティビティ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* よく借りられる物品 */}
+              {/* よく借りられる物品 - 常に表示 */}
               <div className="bg-white shadow rounded-lg overflow-hidden">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                   <h2 className="text-lg font-medium text-gray-900">人気物品ランキング</h2>
                   <BarChart2 className="h-6 w-6 text-gray-400" />
                 </div>
                 <div className="border-t border-gray-200">
-                  {stats.mostBorrowedItems.length > 0 ? (
+                  {isAuthenticated && stats.mostBorrowedItems.length > 0 ? (
                     <div className="p-4 space-y-3">
                       {stats.mostBorrowedItems.map((item, index) => (
                         <div key={item.id} className="flex items-center py-2">
@@ -656,70 +659,122 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                     </div>
                   ) : (
                     <div className="py-12 text-center text-gray-500">
-                      <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                      <p>貸出データがありません</p>
+                      {isAuthenticated ? (
+                        <>
+                          <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                          <p>貸出データがありません</p>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                          <p>ログインするとデータが表示されます</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                   <div className="text-sm">
-                    <Link to="/loaning/statistics" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
-                      詳細な統計を見る
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
+                    {isAuthenticated ? (
+                      <Link to="/loaning/statistics" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
+                        詳細な統計を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (setAuthMode) setAuthMode('signin');
+                          if (setShowAuthModal) setShowAuthModal(true);
+                        }}
+                        className="font-medium text-blue-600 hover:text-blue-500 flex items-center opacity-75"
+                      >
+                        詳細な統計を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
               
-              {/* 最近のアクティビティ */}
-              <div className="bg-white shadow rounded-lg overflow-hidden">
-                <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-                  <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>
-                  <Clock className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="border-t border-gray-200">
-                  {stats.recentActivity.length > 0 ? (
-                    <ul className="divide-y divide-gray-200">
-                      {stats.recentActivity.map((activity) => (
-                        <li key={activity.id} className="px-4 py-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                                activity.action === '貸出' ? 'bg-green-100' : 'bg-orange-100'
-                              }`}>
-                                {activity.action === '貸出' ? (
-                                  <ArrowUpRight className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <ArrowDownRight className="h-4 w-4 text-orange-500" />
-                                )}
-                              </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-gray-900">{activity.item}</p>
-                                <p className="text-xs text-gray-500">
-                                  {activity.action} - {activity.time} - {activity.user}
-                                </p>
+              {/* 最近のアクティビティ - 認証済みユーザーのみに表示 */}
+              {isAuthenticated ? (
+                <div className="bg-white shadow rounded-lg overflow-hidden">
+                  <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+                    <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>
+                    <Clock className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="border-t border-gray-200">
+                    {stats.recentActivity.length > 0 ? (
+                      <ul className="divide-y divide-gray-200">
+                        {stats.recentActivity.map((activity) => (
+                          <li key={activity.id} className="px-4 py-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                                  activity.action === '貸出' ? 'bg-green-100' : 'bg-orange-100'
+                                }`}>
+                                  {activity.action === '貸出' ? (
+                                    <ArrowUpRight className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <ArrowDownRight className="h-4 w-4 text-orange-500" />
+                                  )}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-sm font-medium text-gray-900">{activity.item}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {activity.action} - {activity.time} - {activity.user}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="py-12 text-center text-gray-500">
-                      <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                      <p>アクティビティがありません</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="py-12 text-center text-gray-500">
+                        <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                        <p>アクティビティがありません</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/loaning/log" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
+                        すべての履歴を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Link>
                     </div>
-                  )}
-                </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                  <div className="text-sm">
-                    <Link to="/loaning/log" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
-                      すべての履歴を見る
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // 未ログイン時の「最近のアクティビティ」カードのプレースホルダー
+                <div className="bg-white shadow rounded-lg overflow-hidden">
+                  <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+                    <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>
+                    <Clock className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="border-t border-gray-200">
+                    <div className="py-12 text-center text-gray-500">
+                      <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                      <p>ログインすると貸出履歴が表示されます</p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <button
+                        onClick={() => {
+                          if (setAuthMode) setAuthMode('signin');
+                          if (setShowAuthModal) setShowAuthModal(true);
+                        }}
+                        className="font-medium text-blue-600 hover:text-blue-500 flex items-center opacity-75"
+                      >
+                        すべての履歴を見る
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

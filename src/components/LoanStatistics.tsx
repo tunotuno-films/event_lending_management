@@ -88,6 +88,14 @@ export default function LoanStatistics() {
 
   const fetchEvents = async () => {
     try {
+      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('ユーザー情報が取得できません');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')

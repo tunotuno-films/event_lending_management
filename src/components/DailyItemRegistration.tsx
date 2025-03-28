@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, insertWithUuidOwner } from '../lib/supabase';
 import { AlertCircle, X } from 'lucide-react';
 
 interface Event {
@@ -77,6 +77,14 @@ export default function DailyItemRegistration() {
 
   const fetchEvents = async () => {
     try {
+      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('ユーザー情報が取得できません');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -147,11 +155,10 @@ export default function DailyItemRegistration() {
     }
 
     try {
-      // ユーザーのメールアドレスを取得（Appから渡されるpropsやauthからの取得が必要）
+      // ユーザーのIDを取得
       const { data: { user } } = await supabase.auth.getUser();
-      const userEmail = user?.email;
-
-      if (!userEmail) {
+      
+      if (!user || !user.id) {
         setNotification({
           show: true,
           message: 'ユーザー情報が取得できません。再ログインしてください。',
@@ -160,17 +167,16 @@ export default function DailyItemRegistration() {
         return;
       }
 
-      // created_byフィールドを含める
+      // UUID型の所有者フィールドを使用してデータを挿入
       const controlRecords = selectedItems.map(itemId => ({
         event_id: selectedEventId,
         item_id: itemId,
         status: false,
-        created_by: userEmail // ユーザーのメールアドレスを設定
+        // created_byはinsertWithUuidOwner関数内で自動的に設定されるため省略
       }));
 
-      const { error } = await supabase
-        .from('control')
-        .insert(controlRecords);
+      // 新しいヘルパー関数を使用
+      const { error } = await insertWithUuidOwner('control', controlRecords, { userId: user.id });
 
       if (error) throw error;
 

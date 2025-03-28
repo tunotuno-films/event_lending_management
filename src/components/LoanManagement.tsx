@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, formatJSTDateTime } from '../lib/supabase';
+import { supabase, formatJSTDateTime, insertWithUuidOwner } from '../lib/supabase';
 import { AlertCircle, X, Barcode, StopCircle } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 
@@ -143,6 +143,14 @@ export default function LoanManagement() {
 
   const fetchEvents = async () => {
     try {
+      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('ユーザー情報が取得できません');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -184,11 +192,10 @@ export default function LoanManagement() {
       const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
       const jstDate = new Date(now);
 
-      // ユーザーのメールアドレスを取得
+      // ユーザーIDを取得
       const { data: { user } } = await supabase.auth.getUser();
-      const userEmail = user?.email;
-
-      if (!userEmail) {
+      
+      if (!user || !user.id) {
         setNotification({
           show: true,
           message: 'ユーザー情報が取得できません。再ログインしてください。',
@@ -219,14 +226,19 @@ export default function LoanManagement() {
 
       if (newStatus) {
         // Item is being loaned out - create new result record
-        const { error: insertError } = await supabase
-          .from('result')
-          .insert({
-            event_id: controlData.event_id,
-            item_id: controlData.item_id,
-            start_datetime: jstDate.toISOString(),
-            created_by: userEmail // ユーザーのメールアドレスを設定
-          });
+        const resultData = {
+          event_id: controlData.event_id,
+          item_id: controlData.item_id,
+          start_datetime: jstDate.toISOString()
+          // created_byはinsertWithUuidOwner関数内で自動的に設定されるため省略
+        };
+
+        // 新しいヘルパー関数を使用
+        const { error: insertError } = await insertWithUuidOwner(
+          'result', 
+          resultData, 
+          { userId: user.id }
+        );
 
         if (insertError) throw insertError;
       } else {
@@ -241,22 +253,19 @@ export default function LoanManagement() {
         if (updateResultError) throw updateResultError;
       }
 
+      // Refresh the item lists
+      fetchItems();
+
       setNotification({
         show: true,
-        message: `物品を${newStatus ? '貸出' : '返却'}しました`,
+        message: newStatus ? '貸出処理が完了しました' : '返却処理が完了しました',
         type: 'success'
       });
-
-      fetchItems();
-      setMatchingItems([]);
-      setBarcodeInput('');
-      setShowBarcodeModal(false);
-      setShowItemIdModal(false);
     } catch (error) {
       console.error('Error updating status:', error);
       setNotification({
         show: true,
-        message: '更新中にエラーが発生しました',
+        message: 'ステータス更新中にエラーが発生しました',
         type: 'error'
       });
     }

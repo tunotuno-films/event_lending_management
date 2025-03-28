@@ -86,6 +86,14 @@ export default function LoanHistory() {
 
   const fetchEvents = async () => {
     try {
+      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('ユーザー情報が取得できません');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -157,6 +165,18 @@ export default function LoanHistory() {
     if (!selectedEventId) return;
 
     try {
+      // ユーザーIDを取得して削除操作に使用
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user || !user.id) {
+        setNotification({
+          show: true,
+          message: 'ユーザー情報が取得できません。再ログインしてください。',
+          type: 'error'
+        });
+        return;
+      }
+
       // 60秒未満の貸出を検出
       const shortLoans = loanRecords.filter(record => {
         if (!record.end_datetime) return false;
@@ -175,7 +195,8 @@ export default function LoanHistory() {
         return;
       }
 
-      // 削除実行
+      // RLSポリシーに従って削除操作
+      // created_by = user.idの条件はRLSポリシーによって自動適用される
       const { error } = await supabase
         .from('result')
         .delete()

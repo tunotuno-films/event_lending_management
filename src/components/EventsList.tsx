@@ -21,6 +21,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
+    // タイマーを設定して、カウントダウンを行う
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -32,8 +33,9 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
       });
     }, 1000);
 
+    // クリーンアップ関数でタイマーをクリア
     return () => clearInterval(timer);
-  }, [onClose]);
+  }, [onClose]); // onCloseが変更されたときだけ再実行
 
   const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
   const hoverColor = type === 'success' ? 'hover:bg-green-600' : 'hover:bg-red-600';
@@ -46,7 +48,9 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
         {showUndo && (
           <button
             onClick={() => {
-              onUndo?.();
+              if (onUndo) {
+                onUndo();
+              }
               onClose();
             }}
             className={`${hoverColor} rounded-full p-1 flex items-center gap-1`}
@@ -192,6 +196,17 @@ export default function EventsList() {
 
   const fetchEvents = async () => {
     try {
+      setLoading(true);
+      
+      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('ユーザー情報が取得できません');
+        setLoading(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')

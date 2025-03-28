@@ -76,16 +76,26 @@ export default function RegisterEvent() {
         return;
       }
 
+      // ユーザーのセッション情報を取得
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      const userEmail = user?.email;
+      
+      if (!user || !user.id) {
+        setNotification({
+          show: true,
+          message: 'ユーザー情報が取得できません。再ログインしてください。',
+          type: 'error'
+        });
+        return;
+      }
 
+      // UUIDを使用してイベントを登録
       const { error } = await supabase
         .from('events')
         .insert({
           event_id: formData.eventId,
           name: formData.name,
-          created_by: userEmail  // ユーザーのメールアドレスを設定
+          created_by: user.id  // ユーザーのUUIDを設定
         });
 
       if (error) throw error;
@@ -100,11 +110,22 @@ export default function RegisterEvent() {
         eventId: '',
         name: ''
       });
-    } catch (error) {
-      console.error('Error registering event:', error);
+    } catch (err: unknown) {
+      console.error('Error registering event:', err);
+      
+      let errorMessage = 'Unknown error occurred';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = String(err.message);
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
       setNotification({
         show: true,
-        message: '登録中にエラーが発生しました',
+        message: `登録中にエラーが発生しました: ${errorMessage}`,
         type: 'error'
       });
     }

@@ -91,6 +91,40 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
     checkAuth();
     fetchDashboardData();
     fetchUserProfile();
+    
+    // 認証状態の変更を監視するリスナーを追加
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        // ログアウト時や認証状態の変更時に実行
+        setIsAuthenticated(!!session);
+        
+        if (session) {
+          // ログイン時
+          fetchUserProfile();
+          fetchDashboardData();
+        } else {
+          // ログアウト時
+          setUserProfile(null);
+          setStats({
+            itemsCount: 0,
+            eventsCount: 0,
+            activeLoansCount: 0,
+            completedLoansCount: 0,
+            totalUsers: 0,
+            pendingReturns: 0,
+            mostBorrowedItems: [],
+            recentActivity: []
+          });
+        }
+      }
+    );
+
+    // クリーンアップ関数でリスナーを解除
+    return () => {
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+    };
   }, []);
 
   const fetchDashboardData = async () => {

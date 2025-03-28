@@ -96,72 +96,68 @@ function AppContents() {
 
   // 認証状態を確認する副作用
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      const session = await checkUser();
-      setIsAuthenticated(!!session);
-      setUserEmail(session?.user?.email || null);
+    const checkInitialSession = async () => {
+      setIsLoadingAuth(true);
       
-      // アイコン画像の初期化（リセット）
-      setUserProfileImage(null);
-      
-      // プロフィール画像があれば設定（Google認証など）
-      if (session?.user?.user_metadata?.avatar_url) {
-        setUserProfileImage(session.user.user_metadata.avatar_url);
-      }
-      
-      setIsLoadingAuth(false);
-    };
-
-    checkAuthStatus();
-
-    // Google認証などからのリダイレクトを処理
-    const handleRedirectAuth = async () => {
       try {
-        const { data, error } = await handleAuthRedirect();
-        if (data.session) {
+        // supabase.auth.getSession()を直接使用するように修正
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session && !error) {
           setIsAuthenticated(true);
-          setUserEmail(data.session.user?.email || null);
-          
-          // ユーザー名を取得
-          const userName = data.session.user?.user_metadata?.name || 
-                          data.session.user?.user_metadata?.full_name ||
-                          data.session.user?.email || '';
-          setWelcomeUserName(userName);
-          
-          displayWelcomeAnimation();
+          setUserEmail(session.user?.email || null);
+          setUserProfileImage(session.user?.user_metadata?.avatar_url || null);
+        } else {
+          console.log('No active session found');
+          setIsAuthenticated(false);
+          setUserEmail(null);
+          setUserProfileImage(null);
         }
-      } catch (error) {
-        console.error("Error handling auth redirect:", error);
-      }
-    };
-
-    handleRedirectAuth();
-
-    // 認証状態の変更を監視
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionExists = !!session;
-      setIsAuthenticated(sessionExists);
-      setUserEmail(session?.user?.email || null);
-      
-      // ログアウト時やセッション変更時にアイコンをリセット
-      if (!sessionExists) {
+      } catch (e) {
+        console.error('Unexpected error during session check:', e);
+        setIsAuthenticated(false);
+        setUserEmail(null);
         setUserProfileImage(null);
-      } else if (session?.user?.user_metadata?.avatar_url) {
-        // Google認証などの場合、プロフィール画像を設定
-        setUserProfileImage(session.user.user_metadata.avatar_url);
-      } else {
-        // 通常のメールアドレス認証の場合、プロフィール画像をリセット
-        setUserProfileImage(null);
-      }
-      
-      if (isLoadingAuth) {
+      } finally {
+        // 必ずローディング状態を解除
         setIsLoadingAuth(false);
       }
-    });
+    };
 
-    // クリーンアップ
+    checkInitialSession();
+
+    // 認証状態変更リスナー
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event);
+        
+        if (event === 'SIGNED_IN' && session) {
+          // ログイン成功時
+          setIsAuthenticated(true);
+          // メールアドレスを安全に取得（nullの場合に備えて）
+          setUserEmail(session.user?.email || null);
+          setUserProfileImage(session.user?.user_metadata?.avatar_url || null);
+          
+          // ウェルカムアニメーション表示
+          const name = session.user?.user_metadata?.name || 
+                       session.user?.user_metadata?.full_name || 
+                       (session.user?.email ? session.user.email.split('@')[0] : 'ゲスト');
+          setWelcomeUserName(name);
+          displayWelcomeAnimation();
+        } else if (event === 'SIGNED_OUT') {
+          // ログアウト時
+          setIsAuthenticated(false);
+          setUserEmail(null);
+          setUserProfileImage(null);
+        }
+      }
+    );
+
+    // クリーンアップ関数
     return () => {
-      subscription.unsubscribe();
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
   }, []);
 

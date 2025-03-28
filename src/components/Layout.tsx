@@ -179,17 +179,18 @@ export default function Layout({
           {/* ユーザー情報 */}
           <div className="flex items-center">
             {isAuthenticated ? (
-              <div className="relative flex items-center space-x-2">
-                <UserIcon userProfileImage={userProfileImage} userEmail={userEmail} />
-                <span className="font-medium truncate max-w-[120px]">
+              <div 
+                className="relative flex items-center space-x-2 cursor-pointer group"
+                onClick={() => setShowLogoutModal(true)}
+              >
+                <span className="font-medium truncate max-w-[120px] group-hover:text-blue-600 transition-colors">
                   {userName || userEmail?.split('@')[0] || 'ゲスト'}
                 </span>
-                <button 
-                  onClick={() => setShowLogoutModal(true)}
-                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
-                >
-                  <LogOut size={20} className="text-gray-500" />
-                </button>
+                <UserIcon userProfileImage={userProfileImage} userEmail={userEmail} />
+                {/* ホバー時に表示するドロップダウンヒント */}
+                <span className="absolute hidden group-hover:block right-0 top-full mt-1 bg-white px-2 py-1 text-xs text-gray-600 rounded shadow-md whitespace-nowrap">
+                  ログアウト
+                </span>
               </div>
             ) : (
               <div className="flex gap-2">

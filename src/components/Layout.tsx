@@ -303,13 +303,23 @@ export default function Layout({
                   <span>物品登録</span>
                 </Link>
 
-                <Link 
-                  to="/item/list"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  <LayoutList className="mr-3" size={20} />
-                  <span>物品一覧</span>
-                </Link>
+                {isAuthenticated ? (
+                  <Link 
+                    to="/item/list"
+                    className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    <LayoutList className="mr-3" size={20} />
+                    <span>物品一覧</span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleAuthRequired}
+                    className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                  >
+                    <LayoutList className="mr-3" size={20} />
+                    <span>物品一覧</span>
+                  </button>
+                )}
               </nav>
             </div>
             
@@ -350,30 +360,21 @@ export default function Layout({
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <Calendar className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>イベント登録</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>イベント登録</span>
                     </button>
                     <button
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <LayoutList className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>イベント一覧</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>イベント一覧</span>
                     </button>
                     <button
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <Shuffle className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>当日物品登録</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>当日物品登録</span>
                     </button>
                   </>
                 )}
@@ -417,30 +418,21 @@ export default function Layout({
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <Barcode className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>貸出管理</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>貸出管理</span>
                     </button>
                     <button
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <History className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>貸出履歴</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>貸出履歴</span>
                     </button>
                     <button
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
                       <BarChart className="mr-3" size={20} />
-                      <span className="flex items-center">
-                        <span>貸出統計</span>
-                        <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                      </span>
+                      <span>貸出統計</span>
                     </button>
                   </>
                 )}

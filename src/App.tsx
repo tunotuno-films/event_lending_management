@@ -252,7 +252,12 @@ function AppContents() {
           userProfileImage={userProfileImage}
         >
           <Routes>
-            <Route path="/" element={<Dashboard />} /> {/* ホーム（ダッシュボード） */}
+            <Route path="/" element={
+              <Dashboard 
+                setShowAuthModal={setIsAuthModalOpen} 
+                setAuthMode={setAuthModalMode} 
+              />
+            } /> {/* ホーム（ダッシュボード） */}
             
             {/* 物品管理カテゴリのパス変更 */}
             <Route path="/item/regist" element={
@@ -289,20 +294,34 @@ function AppContents() {
           </Routes>
         </Layout>
       ) : (
-        // 非認証ユーザー向け - こちらも必要ならパス変更
+        // 非認証ユーザー向けセクションを修正
         <Layout
           isAuthenticated={false}
           setShowAuthModal={setIsAuthModalOpen}
           setAuthMode={setAuthModalMode}
         >
           <Routes>
+            {/* ホームページをItemRegistからDashboardに変更 */}
             <Route path="/" element={
+              <Dashboard 
+                setShowAuthModal={setIsAuthModalOpen} 
+                setAuthMode={setAuthModalMode} 
+              />
+            } />
+            
+            {/* 必要に応じて他のパブリックルートを追加 */}
+            <Route path="/item/regist" element={
               <ItemRegist
                 isAuthenticated={false}
                 setAuthModalMode={setAuthModalMode}
                 setIsAuthModalOpen={setIsAuthModalOpen}
               />
             } />
+            
+            <Route path="/item/list" element={<ItemList />} />
+            
+            {/* その他のパブリックルート */}
+            
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

@@ -60,7 +60,14 @@ interface MostBorrowedItem {
   } | null;
 }
 
-const Dashboard: React.FC = () => {
+// コンポーネントの型定義に必要なpropsを追加
+interface DashboardProps {
+  setShowAuthModal?: (show: boolean) => void;
+  setAuthMode?: (mode: 'signin' | 'signup') => void;
+}
+
+// コンポーネント定義を修正
+const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) => {
   const [stats, setStats] = useState<DashboardStats>({
     itemsCount: 0,
     eventsCount: 0,
@@ -73,8 +80,15 @@ const Dashboard: React.FC = () => {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    
+    checkAuth();
     fetchDashboardData();
     fetchUserProfile();
   }, []);
@@ -82,6 +96,26 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      
+      // 認証状態を確認
+      const { data: { session } } = await supabase.auth.getSession();
+      const isAuthenticated = !!session;
+      
+      // 非認証時は最小限のデータのみ表示（またはデモデータを表示）
+      if (!isAuthenticated) {
+        setStats({
+          itemsCount: 0,
+          eventsCount: 0,
+          activeLoansCount: 0,
+          completedLoansCount: 0,
+          totalUsers: 0,
+          pendingReturns: 0,
+          mostBorrowedItems: [],
+          recentActivity: []
+        });
+        setLoading(false);
+        return;
+      }
       
       // アイテム総数を取得
       const { count: itemsCount, error: itemsError } = await supabase
@@ -242,12 +276,13 @@ const Dashboard: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
+        {/* ヘッダー部分を修正：フレックスボックスの方向をスマホでは縦方向に */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">ダッシュボード</h1>
           
-          {/* プロフィール情報を表示 */}
-          {userProfile && (
-            <div className="bg-white shadow rounded-lg p-4 flex items-center">
+          {/* 認証済みの場合のみプロフィール情報を表示 */}
+          {isAuthenticated && userProfile && (
+            <div className="bg-white shadow rounded-lg p-4 flex items-center self-end sm:self-auto">
               <div className="mr-3">
                 {userProfile.avatar_url ? (
                   <img 
@@ -266,8 +301,30 @@ const Dashboard: React.FC = () => {
                 <p className="text-xs text-gray-500">{userProfile.email}</p>
               </div>
               <Link to="/profile" className="ml-4 text-blue-600 hover:text-blue-800 text-sm">
-                プロフィール編集
+                編集
               </Link>
+            </div>
+          )}
+          
+          {/* 非認証時にはログインプロモーションを表示 */}
+          {!isAuthenticated && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full sm:w-auto">
+              <div className="flex items-center">
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-blue-800">
+                    ログインすると全ての機能が利用できます
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (setAuthMode) setAuthMode('signin');
+                      if (setShowAuthModal) setShowAuthModal(true);
+                    }}
+                    className="mt-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                  >
+                    ログイン
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -396,46 +453,145 @@ const Dashboard: React.FC = () => {
               <div className="border-t border-gray-200">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 p-4">
                   {/* 1行目: 物品とイベント関連の5機能 */}
-                  <Link to="/register-item" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                  <Link to="/item/regist" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
                     <Package className="h-8 w-8 text-blue-500 mb-2" />
                     <span className="text-sm text-gray-700">物品登録</span>
                   </Link>
                   
-                  <Link to="/items" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">物品一覧</span>
-                  </Link>
+                  {/* 以下のボタンは未ログイン時にグレーアウト */}
+                  {isAuthenticated ? (
+                    <Link to="/item/list" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">物品一覧</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">物品一覧</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
-                  <Link to="/events/register" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Calendar className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">イベント登録</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/event/regist" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <Calendar className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">イベント登録</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <Calendar className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">イベント登録</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
-                  <Link to="/events" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">イベント一覧</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/event/list" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">イベント一覧</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">イベント一覧</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
-                  <Link to="/daily-registration" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Shuffle className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">当日物品登録</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/event/daily" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <Shuffle className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">当日物品登録</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <Shuffle className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">当日物品登録</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
                   {/* 2行目: 貸出関連の3機能 */}
-                  <Link to="/loan-management" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Barcode className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">貸出管理</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/loaning/control" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <Barcode className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出管理</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <Barcode className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出管理</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
-                  <Link to="/loan-history" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <History className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">貸出履歴</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/loaning/log" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <History className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出履歴</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <History className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出履歴</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                   
-                  <Link to="/loan-statistics" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                    <BarChart className="h-8 w-8 text-blue-500 mb-2" />
-                    <span className="text-sm text-gray-700">貸出統計</span>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/loaning/statistics" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                      <BarChart className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出統計</span>
+                    </Link>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center p-4 rounded-lg cursor-not-allowed opacity-50"
+                      onClick={() => {
+                        if (setAuthMode) setAuthMode('signin');
+                        if (setShowAuthModal) setShowAuthModal(true);
+                      }}
+                    >
+                      <BarChart className="h-8 w-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-gray-700">貸出統計</span>
+                      <span className="text-xs text-red-500 mt-1">ログインが必要</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -448,9 +604,9 @@ const Dashboard: React.FC = () => {
                   <h2 className="text-lg font-medium text-gray-900">人気物品ランキング</h2>
                   <BarChart2 className="h-6 w-6 text-gray-400" />
                 </div>
-                <div className="border-t border-gray-200 p-4">
+                <div className="border-t border-gray-200">
                   {stats.mostBorrowedItems.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="p-4 space-y-3">
                       {stats.mostBorrowedItems.map((item, index) => (
                         <div key={item.id} className="flex items-center py-2">
                           <div className="font-bold text-xl text-gray-400 w-8 text-center">{index + 1}</div>
@@ -465,7 +621,7 @@ const Dashboard: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="py-4 text-center text-gray-500">
+                    <div className="py-12 text-center text-gray-500">
                       <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
                       <p>貸出データがありません</p>
                     </div>
@@ -473,7 +629,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                   <div className="text-sm">
-                    <Link to="/loan-statistics" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
+                    <Link to="/loaning/statistics" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
                       詳細な統計を見る
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Link>
@@ -515,7 +671,7 @@ const Dashboard: React.FC = () => {
                       ))}
                     </ul>
                   ) : (
-                    <div className="py-4 text-center text-gray-500">
+                    <div className="py-12 text-center text-gray-500">
                       <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
                       <p>アクティビティがありません</p>
                     </div>
@@ -523,7 +679,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                   <div className="text-sm">
-                    <Link to="/loan-history" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
+                    <Link to="/loaning/log" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
                       すべての履歴を見る
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Link>

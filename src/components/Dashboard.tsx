@@ -756,7 +756,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                   <div className="border-t border-gray-200">
                     <div className="py-12 text-center text-gray-500">
                       <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                      <p>ログインすると貸出履歴が表示されます</p>
+                      <p>ログインするとデータが表示されます</p>
                     </div>
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">

@@ -23,7 +23,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
   onClose, 
   onAuthSuccess, 
   initialMode, 
-  setMode 
 }) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
   const [authFormData, setAuthFormData] = useState<AuthFormData>({

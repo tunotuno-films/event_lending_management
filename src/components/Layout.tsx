@@ -2,10 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Barcode, 
-  Home, 
   LayoutList, 
-  CreditCard, 
-  Settings, 
   User, 
   LogIn, 
   UserPlus,
@@ -13,7 +10,10 @@ import {
   BarChart,
   Menu,
   X,
-  LogOut // LogOutアイコンを追加
+  LogOut, // LogOutアイコンを追加
+  Calendar, // イベント登録用のカレンダーアイコン
+  Shuffle,         // 交差する矢印（シャッフル）
+  // 元のCreditCardをBarcodeに置き換えるので追加インポート不要
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -129,32 +129,35 @@ export default function Layout({
     }
   };
 
-  // パンくずリストのタイトルを取得
-  const getPageTitle = () => {
+  // カテゴリとページタイトルの取得関数の修正
+  const getBreadcrumbInfo = () => {
     const path = location.pathname;
     
-    switch(path) {
-      case '/':
-        return '物品登録';
-      case '/items':
-        return '物品一覧';
-      case '/events/register':
-        return 'イベント登録';
-      case '/daily-registration':
-        return '当日物品登録';
-      case '/events':
-        return 'イベント一覧';
-      case '/loan-management':
-        return '貸出管理';
-      case '/loan-history':
-        return '貸出履歴';
-      case '/loan-statistics':
-        return '貸出統計';
-      case '/profile':
-        return 'プロフィール';
-      default:
-        return '';
+    // カテゴリとページタイトルのマッピング
+    const pageInfo: Record<string, { category: string; title: string }> = {
+      // 物品管理カテゴリ
+      '/': { category: '物品管理', title: '物品登録' },
+      '/items': { category: '物品管理', title: '物品一覧' },
+      
+      // イベントカテゴリ
+      '/events/register': { category: 'イベント', title: 'イベント登録' },
+      '/events': { category: 'イベント', title: 'イベント一覧' },
+      '/daily-registration': { category: 'イベント', title: '当日物品登録' },
+      
+      // 貸出管理カテゴリ
+      '/loan-management': { category: '貸出管理', title: '貸出管理' },
+      '/loan-history': { category: '貸出管理', title: '貸出履歴' },
+      '/loan-statistics': { category: '貸出管理', title: '貸出統計' },
+      
+      // アカウントカテゴリ
+      '/profile': { category: 'アカウント', title: 'プロフィール' },
+    };
+    
+    // TypeScriptエラーを修正するために型を明示的に指定して返す
+    if (path in pageInfo) {
+      return pageInfo[path];
     }
+    return { category: '', title: '' };
   };
 
   return (
@@ -223,8 +226,22 @@ export default function Layout({
         <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
           <div className="text-sm text-gray-600">
             <span className="text-gray-400">ホーム</span>
-            <span className="mx-2">›</span>
-            <span className="font-medium">{getPageTitle()}</span>
+            
+            {/* カテゴリ部分（存在する場合のみ表示） */}
+            {getBreadcrumbInfo().category && (
+              <>
+                <span className="mx-2">›</span>
+                <span className="text-gray-400">{getBreadcrumbInfo().category}</span>
+              </>
+            )}
+            
+            {/* ページタイトル部分（存在する場合のみ表示） */}
+            {getBreadcrumbInfo().title && (
+              <>
+                <span className="mx-2">›</span>
+                <span className="font-medium">{getBreadcrumbInfo().title}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -298,7 +315,7 @@ export default function Layout({
                       to="/events/register"
                       className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
-                      <Home className="mr-3" size={20} />
+                      <Calendar className="mr-3" size={20} />
                       <span>イベント登録</span>
                     </Link>
                     <Link 
@@ -312,7 +329,7 @@ export default function Layout({
                       to="/daily-registration"
                       className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
-                      <Barcode className="mr-3" size={20} />
+                      <Shuffle className="mr-3" size={20} />
                       <span>当日物品登録</span>
                     </Link>
                   </>
@@ -322,7 +339,7 @@ export default function Layout({
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
-                      <Home className="mr-3" size={20} />
+                      <Calendar className="mr-3" size={20} />
                       <span className="flex items-center">
                         <span>イベント登録</span>
                         <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
@@ -342,7 +359,7 @@ export default function Layout({
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
-                      <Barcode className="mr-3" size={20} />
+                      <Shuffle className="mr-3" size={20} />
                       <span className="flex items-center">
                         <span>当日物品登録</span>
                         <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
@@ -365,7 +382,7 @@ export default function Layout({
                       to="/loan-management"
                       className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
-                      <CreditCard className="mr-3" size={20} />
+                      <Barcode className="mr-3" size={20} />
                       <span>貸出管理</span>
                     </Link>
                     <Link 
@@ -389,7 +406,7 @@ export default function Layout({
                       onClick={handleAuthRequired}
                       className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
                     >
-                      <CreditCard className="mr-3" size={20} />
+                      <Barcode className="mr-3" size={20} />
                       <span className="flex items-center">
                         <span>貸出管理</span>
                         <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
@@ -501,8 +518,9 @@ export default function Layout({
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"
               >
+                <LogOut size={18} className="mr-2" />
                 ログアウト
               </button>
             </div>

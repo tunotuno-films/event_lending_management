@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase, checkUser, handleAuthRedirect, diagnoseSecurity } from './lib/supabase';
-import { Barcode, StopCircle, X, AlertCircle, AlertTriangle } from 'lucide-react';
 
 // コンポーネントのインポート
-import Notification from './components/Notification';
-import BulkUploadModal from './components/BulkUploadModal';
 import Layout from './components/Layout';
 import AuthModal from './components/AuthModal';
 import ItemsList from './components/ItemsList';

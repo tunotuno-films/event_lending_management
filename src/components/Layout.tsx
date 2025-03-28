@@ -27,6 +27,29 @@ interface LayoutProps {
   userProfileImage?: string | null; // プロフィール画像URL
 }
 
+const UserIcon = ({ userProfileImage, userEmail }: { userProfileImage?: string | null; userEmail?: string | null }) => {
+  // ユーザーアイコンの表示ロジック
+  if (userProfileImage) {
+    // プロフィール画像がある場合はそれを表示
+    return (
+      <img 
+        src={userProfileImage} 
+        alt="User Profile" 
+        className="w-8 h-8 rounded-full object-cover"
+      />
+    );
+  } else {
+    // プロフィール画像がない場合はデフォルトアイコンを表示
+    return (
+      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+        <span className="text-gray-600 font-semibold">
+          {userEmail ? userEmail.charAt(0).toUpperCase() : '?'}
+        </span>
+      </div>
+    );
+  }
+};
+
 export default function Layout({
   children,
   isAuthenticated,
@@ -156,27 +179,16 @@ export default function Layout({
           {/* ユーザー情報 */}
           <div className="flex items-center">
             {isAuthenticated ? (
-              <div className="relative flex items-center">
+              <div className="relative flex items-center space-x-2">
+                <UserIcon userProfileImage={userProfileImage} userEmail={userEmail} />
+                <span className="font-medium truncate max-w-[120px]">
+                  {userName || userEmail?.split('@')[0] || 'ゲスト'}
+                </span>
                 <button 
                   onClick={() => setShowLogoutModal(true)}
                   className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
                 >
-                  <span className="font-medium truncate max-w-[120px]">
-                    {userName || userEmail?.split('@')[0] || 'ゲスト'}
-                  </span>
-                  
-                  {/* ユーザーアイコン - プロフィール画像があれば表示、なければデフォルトアイコン */}
-                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    {userProfileImage ? (
-                      <img 
-                        src={userProfileImage} 
-                        alt="プロフィール" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User size={20} className="text-gray-500" />
-                    )}
-                  </div>
+                  <LogOut size={20} className="text-gray-500" />
                 </button>
               </div>
             ) : (

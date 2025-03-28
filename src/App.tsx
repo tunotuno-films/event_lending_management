@@ -102,6 +102,15 @@ function AppContents() {
       const session = await checkUser();
       setIsAuthenticated(!!session);
       setUserEmail(session?.user?.email || null);
+      
+      // アイコン画像の初期化（リセット）
+      setUserProfileImage(null);
+      
+      // プロフィール画像があれば設定（Google認証など）
+      if (session?.user?.user_metadata?.avatar_url) {
+        setUserProfileImage(session.user.user_metadata.avatar_url);
+      }
+      
       setIsLoadingAuth(false);
     };
 
@@ -135,6 +144,18 @@ function AppContents() {
       const sessionExists = !!session;
       setIsAuthenticated(sessionExists);
       setUserEmail(session?.user?.email || null);
+      
+      // ログアウト時やセッション変更時にアイコンをリセット
+      if (!sessionExists) {
+        setUserProfileImage(null);
+      } else if (session?.user?.user_metadata?.avatar_url) {
+        // Google認証などの場合、プロフィール画像を設定
+        setUserProfileImage(session.user.user_metadata.avatar_url);
+      } else {
+        // 通常のメールアドレス認証の場合、プロフィール画像をリセット
+        setUserProfileImage(null);
+      }
+      
       if (isLoadingAuth) {
         setIsLoadingAuth(false);
       }
@@ -192,13 +213,13 @@ function AppContents() {
           <div className="animate-scale-up text-center px-4">
             <div className="hidden sm:flex items-center justify-center space-x-3">
               <span className="text-5xl font-bold text-white">ようこそ</span>
-              <span className="text-5xl font-bold text白">{welcomeUserName}</span>
-              <span className="text-5xl font-bold text白">さん</span>
+              <span className="text-5xl font-bold text-white">{welcomeUserName}</span>
+              <span className="text-5xl font-bold text-white">さん</span>
             </div>
             <div className="flex flex-col items-center sm:hidden">
-              <span className="text-4xl font-bold text白 mb-2">ようこそ</span>
-              <span className="text-4xl font-bold text白">{welcomeUserName}</span>
-              <span className="text-4xl font-bold text白">さん</span>
+              <span className="text-4xl font-bold text-white mb-2">ようこそ</span>
+              <span className="text-4xl font-bold text-white">{welcomeUserName}</span>
+              <span className="text-4xl font-bold text-white">さん</span>
             </div>
           </div>
           <div className="flex-1 flex items-end pb-24 overflow-hidden">

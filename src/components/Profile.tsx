@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+
+// 明示的にローカルストレージをクリアする関数
+export const clearAuthCache = () => {
+  // Supabase関連のローカルストレージエントリをクリア
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('sb-') || key.includes('supabase')) {
+      localStorage.removeItem(key);
+    }
+  });
+};
 
 interface ProfileProps {
   userEmail: string | null;
 }
 
 const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -191,4 +203,4 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
   );
 };
 
-export default Profile; 
+export default Profile;

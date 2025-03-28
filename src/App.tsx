@@ -5,16 +5,17 @@ import { supabase, checkUser, handleAuthRedirect, diagnoseSecurity } from './lib
 // コンポーネントのインポート
 import Layout from './components/Layout';
 import AuthModal from './components/AuthModal';
-import ItemsList from './components/ItemsList';
-import RegisterEvent from './components/RegisterEvent';
-import EventsList from './components/EventsList';
-import DailyItemRegistration from './components/DailyItemRegistration';
-import LoanManagement from './components/LoanManagement';
-import LoanHistory from './components/LoanHistory';
-import LoanStatistics from './components/LoanStatistics';
+import ItemList from './components/ItemList';
+import EventRegist from './components/EventRegist';
+import EventList from './components/EventList';
+import EventDaily from './components/EventDaily';
+import LoaningControl from './components/LoaningControl';
+import LoaningLog from './components/LoaningLog';
+import LoaningStatistics from './components/LoaningStatistics';
 import CsvValidation from './components/CsvValidation';
 import Profile from './components/Profile';
-import RegisterItem from './components/RegisterItem';
+import ItemRegist from './components/ItemRegist';
+import Dashboard from './components/Dashboard';
 import './index.css';
 
 // --- 型定義 ---
@@ -251,8 +252,11 @@ function AppContents() {
           userProfileImage={userProfileImage}
         >
           <Routes>
-            <Route path="/" element={
-              <RegisterItem
+            <Route path="/" element={<Dashboard />} /> {/* ホーム（ダッシュボード） */}
+            
+            {/* 物品管理カテゴリのパス変更 */}
+            <Route path="/item/regist" element={
+              <ItemRegist
                 userEmail={userEmail}
                 isAuthenticated={true}
                 setAuthModalMode={setAuthModalMode}
@@ -260,13 +264,19 @@ function AppContents() {
                 setCsvData={setCsvData}
               />
             } />
-            <Route path="/items" element={<ItemsList />} />
-            <Route path="/events/register" element={<RegisterEvent />} />
-            <Route path="/events" element={<EventsList />} />
-            <Route path="/daily-registration" element={<DailyItemRegistration />} />
-            <Route path="/loan-management" element={<LoanManagement />} />
-            <Route path="/loan-history" element={<LoanHistory />} />
-            <Route path="/loan-statistics" element={<LoanStatistics />} />
+            <Route path="/item/list" element={<ItemList />} />
+            
+            {/* イベントカテゴリのパス変更 */}
+            <Route path="/event/regist" element={<EventRegist />} />
+            <Route path="/event/list" element={<EventList />} />
+            <Route path="/event/daily" element={<EventDaily />} />
+            
+            {/* 貸出管理カテゴリのパス変更 */}
+            <Route path="/loaning/control" element={<LoaningControl />} />
+            <Route path="/loaning/log" element={<LoaningLog />} />
+            <Route path="/loaning/statistics" element={<LoaningStatistics />} />
+            
+            {/* その他のパスは変更なし */}
             <Route path="/csv-validation" element={
               <CsvValidation 
                 csvData={csvData} 
@@ -279,7 +289,7 @@ function AppContents() {
           </Routes>
         </Layout>
       ) : (
-        // 非認証ユーザー向け
+        // 非認証ユーザー向け - こちらも必要ならパス変更
         <Layout
           isAuthenticated={false}
           setShowAuthModal={setIsAuthModalOpen}
@@ -287,7 +297,7 @@ function AppContents() {
         >
           <Routes>
             <Route path="/" element={
-              <RegisterItem
+              <ItemRegist
                 isAuthenticated={false}
                 setAuthModalMode={setAuthModalMode}
                 setIsAuthModalOpen={setIsAuthModalOpen}

@@ -64,7 +64,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-export default function LoanManagement() {
+export default function LoaningControl() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [waitingItems, setWaitingItems] = useState<Control[]>([]);

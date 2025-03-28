@@ -62,7 +62,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   `${i.toString().padStart(2, '0')}:00`
 );
 
-export default function LoanStatistics() {
+export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [statistics, setStatistics] = useState<ItemStatistics[]>([]);

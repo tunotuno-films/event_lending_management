@@ -60,7 +60,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-export default function LoanHistory() {
+export default function LoaningLog() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [loanRecords, setLoanRecords] = useState<LoanRecord[]>([]);

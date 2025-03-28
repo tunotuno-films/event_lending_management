@@ -15,7 +15,7 @@ interface AuthModalProps {
   onClose: () => void;
   onAuthSuccess: (email: string, name?: string) => void;
   initialMode: 'signin' | 'signup';
-  setMode: (mode: 'signin' | 'signup') => void; // setModeプロパティを追加
+  setMode: (mode: 'signin' | 'signup') => void; // 親コンポーネントのstate更新関数
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ 
@@ -23,14 +23,25 @@ const AuthModal: React.FC<AuthModalProps> = ({
   onClose, 
   onAuthSuccess, 
   initialMode, 
+  setMode
 }) => {
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
+  // 内部stateとしてのauthModeを削除し、propsから受け取ったinitialModeを使用
   const [authFormData, setAuthFormData] = useState<AuthFormData>({
     email: '',
     password: '',
     name: '',
     phoneNumber: '',
   });
+
+  // initialModeが変更されたらフォームをリセット
+  useEffect(() => {
+    setAuthFormData({
+      email: '',
+      password: '',
+      name: '',
+      phoneNumber: '',
+    });
+  }, [initialMode]);
 
   useEffect(() => {
     // ESCキーでモーダルを閉じられるようにする
@@ -116,7 +127,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (authMode === 'signin') {
+      if (initialMode === 'signin') {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: authFormData.email,
           password: authFormData.password,
@@ -166,7 +177,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
         <div className="p-6 sm:p-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl sm:text-2xl font-bold">
-              {authMode === 'signin' ? 'ログイン' : '会員登録'}
+              {initialMode === 'signin' ? 'ログイン' : '会員登録'}
             </h2>
             <button 
               onClick={onClose} 
@@ -189,7 +200,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
-              <span className="text-base">{authMode === 'signin' ? 'Googleでログイン' : 'Googleで登録'}</span>
+              <span className="text-base">{initialMode === 'signin' ? 'Googleでログイン' : 'Googleで登録'}</span>
             </button>
           </div>
           
@@ -231,7 +242,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
               />
               
               {/* パスワード強度インジケーター */}
-              {authFormData.password && authMode === 'signup' && (
+              {authFormData.password && initialMode === 'signup' && (
                 <div className="mt-3">
                   <div className="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div 
@@ -250,12 +261,12 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   </p>
                 </div>
               )}
-              {(!authFormData.password || authMode === 'signin') && (
+              {(!authFormData.password || initialMode === 'signin') && (
                 <p className="text-xs text-gray-500 mt-2">英数字と記号のみ入力できます（8文字以上）</p>
               )}
             </div>
             
-            {authMode === 'signup' && (
+            {initialMode === 'signup' && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -297,16 +308,16 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-md flex items-center justify-center gap-2 text-base"
               >
                 <Mail size={18} />
-                {authMode === 'signin' ? 'メールでログイン' : 'メールで登録'}
+                {initialMode === 'signin' ? 'メールでログイン' : 'メールで登録'}
               </button>
             </div>
           </form>
           <div className="mt-6 text-center">
             <button
-              onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+              onClick={() => setMode(initialMode === 'signin' ? 'signup' : 'signin')}
               className="text-blue-500 hover:text-blue-600 text-base"
             >
-              {authMode === 'signin' ? '会員登録はこちら' : 'ログインはこちら'}
+              {initialMode === 'signin' ? '会員登録はこちら' : 'ログインはこちら'}
             </button>
           </div>
         </div>

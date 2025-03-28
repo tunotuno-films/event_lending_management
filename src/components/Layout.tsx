@@ -13,7 +13,8 @@ import {
   LogOut, // LogOutアイコンを追加
   Calendar, // イベント登録用のカレンダーアイコン
   Shuffle,         // 交差する矢印（シャッフル）
-  // 元のCreditCardをBarcodeに置き換えるので追加インポート不要
+  Home, // ホームアイコンを追加
+  Package // 物品登録アイコンを変更
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -129,25 +130,28 @@ export default function Layout({
     }
   };
 
-  // カテゴリとページタイトルの取得関数の修正
+  // getBreadcrumbInfo関数を修正
   const getBreadcrumbInfo = () => {
     const path = location.pathname;
     
     // カテゴリとページタイトルのマッピング
     const pageInfo: Record<string, { category: string; title: string }> = {
+      // ホームはメニューカテゴリ
+      '/': { category: 'メニュー', title: 'ホーム' },
+      
       // 物品管理カテゴリ
-      '/': { category: '物品管理', title: '物品登録' },
-      '/items': { category: '物品管理', title: '物品一覧' },
+      '/item/regist': { category: '物品管理', title: '物品登録' },
+      '/item/list': { category: '物品管理', title: '物品一覧' },
       
       // イベントカテゴリ
-      '/events/register': { category: 'イベント', title: 'イベント登録' },
-      '/events': { category: 'イベント', title: 'イベント一覧' },
-      '/daily-registration': { category: 'イベント', title: '当日物品登録' },
+      '/event/regist': { category: 'イベント', title: 'イベント登録' },
+      '/event/list': { category: 'イベント', title: 'イベント一覧' },
+      '/event/daily': { category: 'イベント', title: '当日物品登録' },
       
       // 貸出管理カテゴリ
-      '/loan-management': { category: '貸出管理', title: '貸出管理' },
-      '/loan-history': { category: '貸出管理', title: '貸出履歴' },
-      '/loan-statistics': { category: '貸出管理', title: '貸出統計' },
+      '/loaning/control': { category: '貸出管理', title: '貸出管理' },
+      '/loaning/log': { category: '貸出管理', title: '貸出履歴' },
+      '/loaning/statistics': { category: '貸出管理', title: '貸出統計' },
       
       // アカウントカテゴリ
       '/profile': { category: 'アカウント', title: 'プロフィール' },
@@ -225,21 +229,24 @@ export default function Layout({
         {/* パンくずリスト - PC・スマホ両方で表示 */}
         <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
           <div className="text-sm text-gray-600">
-            <span className="text-gray-400">ホーム</span>
+            {/* ホームへのリンク - 常に表示 */}
+            <Link to="/" className="text-gray-500 hover:text-gray-700">
+              ホーム
+            </Link>
             
             {/* カテゴリ部分（存在する場合のみ表示） */}
-            {getBreadcrumbInfo().category && (
+            {getBreadcrumbInfo().category && getBreadcrumbInfo().category !== 'メニュー' && (
               <>
                 <span className="mx-2">›</span>
-                <span className="text-gray-400">{getBreadcrumbInfo().category}</span>
+                <span className="text-gray-500">{getBreadcrumbInfo().category}</span>
               </>
             )}
             
-            {/* ページタイトル部分（存在する場合のみ表示） */}
-            {getBreadcrumbInfo().title && (
+            {/* ページタイトル部分（存在する場合のみ表示、ホームページは除外） */}
+            {getBreadcrumbInfo().title && location.pathname !== '/' && (
               <>
                 <span className="mx-2">›</span>
-                <span className="font-medium">{getBreadcrumbInfo().title}</span>
+                <span className="font-medium text-gray-800">{getBreadcrumbInfo().title}</span>
               </>
             )}
           </div>
@@ -266,6 +273,22 @@ export default function Layout({
           
           {/* サイドバーコンテンツ - ログイン状態に関わらず全て表示 */}
           <div className="py-4">
+            {/* メニュー - ホームだけを残す */}
+            <div className="px-4 mb-6">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                メニュー
+              </div>
+              <nav className="space-y-1">
+                <Link 
+                  to="/"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <Home className="mr-3" size={20} />
+                  <span>ホーム</span>
+                </Link>
+              </nav>
+            </div>
+            
             {/* 物品管理メニュー */}
             <div className="px-4 mb-6">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
@@ -273,33 +296,20 @@ export default function Layout({
               </div>
               <nav className="space-y-1">
                 <Link 
-                  to="/"
-                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  to="/item/regist"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/regist' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                 >
-                  <Barcode className="mr-3" size={20} />
+                  <Package className="mr-3" size={20} />
                   <span>物品登録</span>
                 </Link>
-                
-                {isAuthenticated ? (
-                  <Link 
-                    to="/items"
-                    className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/items' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                  >
-                    <LayoutList className="mr-3" size={20} />
-                    <span>物品一覧</span>
-                  </Link>
-                ) : (
-                  <button
-                    onClick={handleAuthRequired}
-                    className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
-                  >
-                    <LayoutList className="mr-3" size={20} />
-                    <span className="flex items-center">
-                      <span>物品一覧</span>
-                      <span className="text-xs text-red-500 ml-1 whitespace-nowrap" style={{ fontSize: '0.65rem' }}>(要ログイン)</span>
-                    </span>
-                  </button>
-                )}
+
+                <Link 
+                  to="/item/list"
+                  className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <LayoutList className="mr-3" size={20} />
+                  <span>物品一覧</span>
+                </Link>
               </nav>
             </div>
             
@@ -312,22 +322,22 @@ export default function Layout({
                 {isAuthenticated ? (
                   <>
                     <Link 
-                      to="/events/register"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events/register' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/event/regist"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/regist' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <Calendar className="mr-3" size={20} />
                       <span>イベント登録</span>
                     </Link>
                     <Link 
-                      to="/events"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/events' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/event/list"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <LayoutList className="mr-3" size={20} />
                       <span>イベント一覧</span>
                     </Link>
                     <Link 
-                      to="/daily-registration"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/daily-registration' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/event/daily"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/daily' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <Shuffle className="mr-3" size={20} />
                       <span>当日物品登録</span>
@@ -379,22 +389,22 @@ export default function Layout({
                 {isAuthenticated ? (
                   <>
                     <Link 
-                      to="/loan-management"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-management' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/loaning/control"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/control' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <Barcode className="mr-3" size={20} />
                       <span>貸出管理</span>
                     </Link>
                     <Link 
-                      to="/loan-history"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-history' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/loaning/log"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/log' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <History className="mr-3" size={20} />
                       <span>貸出履歴</span>
                     </Link>
                     <Link 
-                      to="/loan-statistics"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loan-statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      to="/loaning/statistics"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <BarChart className="mr-3" size={20} />
                       <span>貸出統計</span>

@@ -54,7 +54,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-export default function DailyItemRegistration() {
+export default function EventDaily() {
   const [events, setEvents] = useState<Event[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');

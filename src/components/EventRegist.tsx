@@ -43,7 +43,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-export default function RegisterEvent() {
+export default function EventRegist() {
   const [formData, setFormData] = useState({
     eventId: '',
     name: ''

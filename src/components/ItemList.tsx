@@ -296,7 +296,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   );
 };
 
-export default function ItemsList() {
+export default function ItemList() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<Item | null>(null);

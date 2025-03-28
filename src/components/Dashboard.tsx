@@ -19,7 +19,7 @@ import {
   Lock, // ログインが必要な場合のアイコン
 } from 'lucide-react';
 
-// 型定義の修正
+// stats型定義の修正
 interface DashboardStats {
   itemsCount: number;
   eventsCount: number;
@@ -27,7 +27,7 @@ interface DashboardStats {
   completedLoansCount: number;
   totalUsers: number;
   pendingReturns: number;
-  mostBorrowedItems: Array<{id: string, name: string, count: number}>;
+  mostBorrowedItems: Array<{id: string, name: string, image: string | null, count: number}>;
   recentActivity: Array<{id: number, action: string, item: string, time: string, user: string}>;
 }
 
@@ -58,6 +58,7 @@ interface MostBorrowedItem {
   item_id: string;
   items?: {
     name?: string;
+    image?: string;
   } | null;
 }
 
@@ -186,27 +187,34 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         .from('result')
         .select(`
           item_id,
-          items:item_id (name)
+          items:item_id (name, image)
         `)
         .limit(100);
       
-      let mostBorrowedItems: Array<{id: string, name: string, count: number}> = [];
+      let mostBorrowedItems: Array<{id: string, name: string, image: string, count: number}> = [];
       if (mostBorrowed) {
         // アイテムごとの貸出回数をカウント
-        const itemCounts: Record<string, {count: number, name: string}> = {};
+        const itemCounts: Record<string, {count: number, name: string, image: string | null}> = {};
         (mostBorrowed as MostBorrowedItem[]).forEach(item => {
           const id = item.item_id;
           // 明示的な型アサーションとオプショナルチェーン
           const name = item.items?.name || '不明な物品';
+          const image = item.items?.image || null; // 画像URLはnullの可能性がある
+          
           if (!itemCounts[id]) {
-            itemCounts[id] = { count: 0, name };
+            itemCounts[id] = { count: 0, name, image };
           }
           itemCounts[id].count++;
         });
         
         // カウント数でソートして上位5件を取得
         mostBorrowedItems = Object.entries(itemCounts)
-          .map(([id, { count, name }]) => ({ id, name, count }))
+          .map(([id, { count, name, image }]) => ({ 
+            id, 
+            name, 
+            image: image || '', // nullの場合は空文字列を設定
+            count 
+          }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5);
       }
@@ -635,45 +643,85 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
             
             {/* データ可視化セクション - 人気物品ランキングと最近のアクティビティ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* よく借りられる物品 - 常に表示 */}
-              <div className="bg-white shadow rounded-lg overflow-hidden">
+              {/* よく借りられる物品カード - 常に表示 */}
+              <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                   <h2 className="text-lg font-medium text-gray-900">人気物品ランキング</h2>
                   <BarChart2 className="h-6 w-6 text-gray-400" />
                 </div>
-                <div className="border-t border-gray-200">
-                  {isAuthenticated && stats.mostBorrowedItems.length > 0 ? (
-                    <div className="p-4 space-y-3">
-                      {stats.mostBorrowedItems.map((item, index) => (
-                        <div key={item.id} className="flex items-center py-2">
-                          <div className="font-bold text-xl text-gray-400 w-8 text-center">{index + 1}</div>
-                          <div className="ml-4 flex-1">
-                            <div className="font-medium text-gray-900">{item.name}</div>
-                            <div className="text-sm text-gray-500">貸出回数: {item.count}回</div>
+                <div className="border-t border-gray-200 flex-grow">
+                  {/* データコンテナに固定高さではなくフレックス成長を設定 */}
+                  <div className="h-full">
+                    {isAuthenticated && stats.mostBorrowedItems.length > 0 ? (
+                      <div className="p-4 space-y-3">
+                        {stats.mostBorrowedItems.map((item, index) => (
+                          <div key={item.id} className="flex items-center py-2">
+                            {/* 順位表示 - 右側の余白を増やす */}
+                            <div className="font-bold text-xl text-gray-400 w-10 text-center mr-2">
+                              {index + 1}
+                            </div>
+                            
+                            {/* 画像表示部分 - 両側の余白を増やす */}
+                            <div className="mx-3 h-12 w-12 flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center bg-white">
+                              {item.image ? (
+                                <img 
+                                  src={item.image} 
+                                  alt={item.name} 
+                                  className="max-h-full max-w-full object-contain" 
+                                />
+                              ) : (
+                                <div className="h-12 w-12 rounded-md bg-gray-50 flex items-center justify-center">
+                                  <Package className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* テキスト情報部分 - 左側の余白を増やす */}
+                            <div className="ml-3 flex-1">
+                              <div className="font-medium text-gray-900">{item.name}</div>
+                              <div className="text-sm text-gray-500">貸出回数: {item.count}回</div>
+                            </div>
+                            
+                            {/* 「最も人気」バッジ */}
+                            {index === 0 ? (
+                              <div className="flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                最も人気
+                              </div>
+                            ) : null}
                           </div>
-                          <div className="flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {index === 0 ? '最も人気' : ''}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-12 text-center text-gray-500">
-                      {isAuthenticated ? (
-                        <>
-                          <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                          <p>貸出データがありません</p>
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                          <p>ログインするとデータが表示されます</p>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-60 py-12 text-center text-gray-500">
+                        {isAuthenticated ? (
+                          <>
+                            <div className="flex flex-col items-center">
+                              <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                              <p>貸出データがありません</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex flex-col items-center">
+                              <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                              <p>ログインするとデータが表示されます</p>
+                              <button
+                                onClick={() => {
+                                  if (setAuthMode) setAuthMode('signin');
+                                  if (setShowAuthModal) setShowAuthModal(true);
+                                }}
+                                className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                              >
+                                ログイン
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                <div className="bg-gray-50 px-4 py-4 sm:px-6 mt-auto">
                   <div className="text-sm">
                     {isAuthenticated ? (
                       <Link to="/loaning/statistics" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
@@ -696,48 +744,52 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                 </div>
               </div>
               
-              {/* 最近のアクティビティ - 認証済みユーザーのみに表示 */}
+              {/* 最近のアクティビティカード - 同じ構造で統一 */}
               {isAuthenticated ? (
-                <div className="bg-white shadow rounded-lg overflow-hidden">
+                <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                   <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                     <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>
                     <Clock className="h-6 w-6 text-gray-400" />
                   </div>
-                  <div className="border-t border-gray-200">
-                    {stats.recentActivity.length > 0 ? (
-                      <ul className="divide-y divide-gray-200">
-                        {stats.recentActivity.map((activity) => (
-                          <li key={activity.id} className="px-4 py-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                                  activity.action === '貸出' ? 'bg-green-100' : 'bg-orange-100'
-                                }`}>
-                                  {activity.action === '貸出' ? (
-                                    <ArrowUpRight className="h-4 w-4 text-green-600" />
-                                  ) : (
-                                    <ArrowDownRight className="h-4 w-4 text-orange-500" />
-                                  )}
-                                </div>
-                                <div className="ml-3">
-                                  <p className="text-sm font-medium text-gray-900">{activity.item}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {activity.action} - {activity.time} - {activity.user}
-                                  </p>
+                  <div className="border-t border-gray-200 flex-grow">
+                    <div className="h-full">
+                      {stats.recentActivity.length > 0 ? (
+                        <ul className="divide-y divide-gray-200">
+                          {stats.recentActivity.map((activity) => (
+                            <li key={activity.id} className="px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                                    activity.action === '貸出' ? 'bg-green-100' : 'bg-orange-100'
+                                  }`}>
+                                    {activity.action === '貸出' ? (
+                                      <ArrowUpRight className="h-4 w-4 text-green-600" />
+                                    ) : (
+                                      <ArrowDownRight className="h-4 w-4 text-orange-500" />
+                                    )}
+                                  </div>
+                                  <div className="ml-3">
+                                    <p className="text-sm font-medium text-gray-900">{activity.item}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {activity.action} - {activity.time} - {activity.user}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="py-12 text-center text-gray-500">
-                        <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                        <p>アクティビティがありません</p>
-                      </div>
-                    )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="flex items-center justify-center h-60 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <HelpCircle className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                            <p>アクティビティがありません</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6 mt-auto">
                     <div className="text-sm">
                       <Link to="/loaning/log" className="font-medium text-blue-600 hover:text-blue-500 flex items-center">
                         すべての履歴を見る
@@ -748,18 +800,29 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                 </div>
               ) : (
                 // 未ログイン時の「最近のアクティビティ」カードのプレースホルダー
-                <div className="bg-white shadow rounded-lg overflow-hidden">
+                <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                   <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                     <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>
                     <Clock className="h-6 w-6 text-gray-400" />
                   </div>
-                  <div className="border-t border-gray-200">
-                    <div className="py-12 text-center text-gray-500">
-                      <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                      <p>ログインするとデータが表示されます</p>
+                  <div className="border-t border-gray-200 flex-grow">
+                    <div className="flex items-center justify-center h-60 py-12 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                        <p>ログインするとデータが表示されます</p>
+                        <button
+                          onClick={() => {
+                            if (setAuthMode) setAuthMode('signin');
+                            if (setShowAuthModal) setShowAuthModal(true);
+                          }}
+                          className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                        >
+                          ログイン
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6 mt-auto">
                     <div className="text-sm">
                       <button
                         onClick={() => {

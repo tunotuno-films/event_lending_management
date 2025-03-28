@@ -284,10 +284,10 @@
         const finalGenre = formData.genre === 'その他' ? formData.customGenre : formData.genre;
         const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
 
+        // ユーザーIDを取得（UUIDを取得）
         const { data: { user } } = await supabase.auth.getUser();
-        const currentUserEmail = user?.email;
-
-        if (!currentUserEmail) {
+        
+        if (!user || !user.id) {
             setNotification({
             show: true,
             message: 'ユーザー情報が取得できません。再ログインしてください。',
@@ -296,6 +296,7 @@
             return false;
         }
 
+        // registered_byフィールドにはUUID型のユーザーIDを設定
         const { error: insertError } = await supabase
             .from('items')
             .insert({
@@ -304,7 +305,7 @@
             image: publicUrl,
             genre: finalGenre,
             manager: finalManager,
-            registered_by: currentUserEmail, // 現在のユーザーのメールアドレスを確実に設定
+            registered_by: user.id, // メールアドレスではなくUUIDを使用
             registered_date: new Date().toISOString()
             });
 

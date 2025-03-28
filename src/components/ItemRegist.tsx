@@ -177,19 +177,6 @@
         };
     }, []);
 
-    useEffect(() => {
-        // 未ログイン状態でコンポーネントがマウントされたときに自動的にログインモーダルを表示
-        if (!isAuthenticated && setAuthModalMode && setIsAuthModalOpen) {
-        // ページが読み込まれてから少し遅延させてモーダルを表示（UX向上のため）
-        const timer = setTimeout(() => {
-            setAuthModalMode('signin');
-            setIsAuthModalOpen(true);
-        }, 300); // 300ミリ秒の遅延で表示
-        
-        return () => clearTimeout(timer); // コンポーネントがアンマウントされた場合のクリーンアップ
-        }
-    }, []); // 空の依存配列でコンポーネントの初回レンダリング時のみ実行
-
     const fetchExistingData = async () => {
         try {
         const { data: items } = await supabase
@@ -657,33 +644,39 @@
                 )}
             </div>
 
-            {/* フォームの送信ボタン部分を条件分岐で修正 */}
+            {/* フォーム送信ボタン部分を条件分岐で修正 */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center">
+                {isAuthenticated ? (
                 <button
-                type="submit"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors order-1 w-full sm:w-auto"
+                    type="submit"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
                 >
-                登録する
+                    <span>登録する</span>
                 </button>
+                ) : (
+                <button
+                    type="button"
+                    onClick={() => {
+                    if (setAuthModalMode && setIsAuthModalOpen) {
+                        setAuthModalMode('signin');
+                        setIsAuthModalOpen(true);
+                    }
+                    }}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                >
+                    <span>登録するにはログインが必要です</span>
+                </button>
+                )}
                 
-                {/* ログイン済みの場合のみCSV関連ボタンを表示 */}
+                {/* バルクアップロードボタン（認証済みユーザーのみ表示） */}
                 {isAuthenticated && (
-                <>
-                    <button
+                <button
                     type="button"
                     onClick={() => setShowBulkUploadModal(true)}
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md transition-colors order-2 w-full sm:w-auto"
-                    >
-                    CSVで一括登録
-                    </button>
-                    <button
-                    type="button"
-                    className="text-sm text-blue-500 hover:text-blue-700 order-3 mt-2 sm:mt-0 sm:ml-auto"
-                    onClick={downloadCsvTemplate}
-                    >
-                    CSVテンプレートDL
-                    </button>
-                </>
+                    className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                >
+                    <span>一括登録</span>
+                </button>
                 )}
             </div>
             </form> 

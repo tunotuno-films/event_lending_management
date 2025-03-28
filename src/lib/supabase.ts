@@ -31,7 +31,30 @@ const options = {
 };
 
 // Create Supabase client with options
-export const supabase = createClient(finalSupabaseUrl, finalSupabaseAnonKey, options);
+export const supabase = createClient(finalSupabaseUrl, finalSupabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storage: window.localStorage,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: { 'x-timezone': 'Asia/Tokyo' },
+  },
+});
+
+// サービスロールを使用する管理者用クライアント（使用しないこと）
+// 注意: このクライアントはRLSをバイパスします
+// export const adminSupabase = (serviceRoleKey?: string) => {
+//   if (!serviceRoleKey) {
+//     console.error('Service role key is required for admin operations');
+//     return null;
+//   }
+//   return createClient(finalSupabaseUrl, serviceRoleKey, {
+//     auth: {
+//       persistSession: false,
+//     },
+//   });
+// };
 
 // Helper function to check if Supabase is properly configured
 export const checkSupabaseConfig = () => {
@@ -134,7 +157,7 @@ export const createProfilesTable = async () => {
       // SQLを実行（実際にはここでは実行できないのでログだけ出力）
       console.log('Creating profiles table RPC function:', createRpcSQL);
       
-      // SQLを管理者権限で実行するためのエンドポイントを呼び出す方法を提案
+      // SQLを管理者権限で実行するためのエンドポイントを提案
       alert('プロフィールテーブルの作成が必要です。管理者にお問い合わせください。');
       
       return { success: false, error: 'RPC function not available' };
@@ -269,5 +292,158 @@ export const handleAuthRedirect = async () => {
   } catch (err) {
     console.error('Error handling redirect:', err);
     return { data, error: err as any };
+  }
+};
+
+// RLS診断用関数を改良（既存の関数を置き換え）
+export const diagnoseSecurity = async (tableName: string) => {
+  console.log(`Diagnosing RLS for ${tableName}...`);
+  
+  try {
+    // 現在のユーザーを取得
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Current user:', user?.email);
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return { success: false, error: 'No authenticated user' };
+    }
+    
+    // JWT情報の取得を試みる
+    try {
+      const { data: jwtData, error: jwtError } = await supabase.rpc('get_jwt_claim', {
+        claim_name: 'email'
+      });
+      
+      if (jwtError) {
+        console.log('Error getting JWT claim, helper function might not exist:', jwtError);
+        console.log('You may need to create the JWT helper function in Supabase');
+      } else {
+        console.log('JWT email claim:', jwtData);
+        
+        // JWTのメールアドレスがsupabase.auth.getUser()と一致するか確認
+        if (jwtData !== user.email) {
+          console.warn('JWT email claim does not match user email - this may cause RLS issues!');
+        }
+      }
+    } catch (e) {
+      console.log('Error accessing JWT helper function:', e);
+    }
+    
+    // テーブルからデータ取得を試みる
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .limit(10);
+    
+    if (error) {
+      console.error(`Error accessing ${tableName}:`, error);
+      return { success: false, error };
+    }
+    
+    console.log(`Successfully fetched ${data.length} records from ${tableName}`);
+    
+    // 所有者フィールドの値を確認
+    const ownerField = tableName === 'items' ? 'registered_by' : 'created_by';
+    
+    // データが存在するが所有者情報がない場合は警告
+    const missingOwnerRecords = data.filter(record => !record[ownerField]);
+    if (missingOwnerRecords.length > 0) {
+      console.warn(`${missingOwnerRecords.length} records without owner information in ${tableName}`);
+      console.log('Sample record without owner:', missingOwnerRecords[0]);
+    }
+    
+    // 所有者が異なるレコード数
+    const otherOwnerRecords = data.filter(record => 
+      record[ownerField] && record[ownerField] !== user.email
+    );
+    
+    if (otherOwnerRecords.length > 0) {
+      console.warn(`Found ${otherOwnerRecords.length} records owned by others - RLS might not be working!`);
+      console.log('Sample record from another owner:', otherOwnerRecords[0]);
+    }
+    
+    // 所有者が自分のレコード
+    const ownRecords = data.filter(record => record[ownerField] === user.email);
+    console.log(`Found ${ownRecords.length} records owned by current user`);
+    
+    if (data.length > 0 && data[0][ownerField]) {
+      console.log(`Sample record owner: ${data[0][ownerField]}`);
+      console.log(`Current user matches record owner: ${data[0][ownerField] === user.email}`);
+    } else {
+      console.log(`No owner field found in records or no records available`);
+    }
+    
+    // 診断情報をコンソールにテーブル形式で表示
+    console.table({
+      'tableName': tableName,
+      'totalRecords': data.length,
+      'ownedByCurrentUser': ownRecords.length,
+      'ownedByOthers': otherOwnerRecords.length,
+      'withoutOwner': missingOwnerRecords.length
+    });
+    
+    return { 
+      success: true, 
+      data,
+      diagnostics: {
+        currentUser: user.email,
+        recordsCount: data.length,
+        ownRecordsCount: ownRecords.length,
+        missingOwnerCount: missingOwnerRecords.length,
+        otherOwnerCount: otherOwnerRecords.length
+      }
+    };
+  } catch (error) {
+    console.error(`Error during diagnosis:`, error);
+    return { success: false, error };
+  }
+};
+
+// ユーティリティ関数を追加
+
+// 現在のユーザーメールアドレスを取得する関数
+export const getCurrentUserEmail = async (): Promise<string | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.email || null;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+// テーブルに挿入するときに所有者フィールドを自動的に追加する関数
+export const insertWithOwner = async (
+  table: string,
+  data: any | any[],
+  options?: { userEmail?: string }
+) => {
+  try {
+    const userEmail = options?.userEmail || await getCurrentUserEmail();
+    
+    if (!userEmail) {
+      throw new Error('User not authenticated or email not available');
+    }
+    
+    const ownerField = table === 'items' ? 'registered_by' : 'created_by';
+    
+    // 配列かどうかをチェック
+    const isArray = Array.isArray(data);
+    const dataWithOwner = isArray
+      ? data.map(item => ({ ...item, [ownerField]: userEmail }))
+      : { ...data, [ownerField]: userEmail };
+    
+    // 挿入操作を実行
+    const result = await supabase.from(table).insert(dataWithOwner);
+    
+    if (result.error) {
+      console.error(`Error inserting into ${table}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`Error in insertWithOwner for ${table}:`, error);
+    throw error;
   }
 };

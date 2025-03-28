@@ -297,6 +297,18 @@
         const finalGenre = formData.genre === 'その他' ? formData.customGenre : formData.genre;
         const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
 
+        const { data: { user } } = await supabase.auth.getUser();
+        const currentUserEmail = user?.email;
+
+        if (!currentUserEmail) {
+            setNotification({
+            show: true,
+            message: 'ユーザー情報が取得できません。再ログインしてください。',
+            type: 'error'
+            });
+            return false;
+        }
+
         const { error: insertError } = await supabase
             .from('items')
             .insert({
@@ -305,7 +317,7 @@
             image: publicUrl,
             genre: finalGenre,
             manager: finalManager,
-            registered_by: userEmail, // ユーザーのメールアドレスを確実に設定
+            registered_by: currentUserEmail, // 現在のユーザーのメールアドレスを確実に設定
             registered_date: new Date().toISOString()
             });
 

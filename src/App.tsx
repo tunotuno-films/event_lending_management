@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom'; // Navigate を追加
-import { supabase, checkUser, handleAuthRedirect } from './lib/supabase';
-import { Barcode, StopCircle, X, AlertCircle, AlertTriangle } from 'lucide-react'; // AlertTriangle を追加
-import { useZxing } from 'react-zxing';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { supabase, checkUser, handleAuthRedirect, diagnoseSecurity } from './lib/supabase';
+import { Barcode, StopCircle, X, AlertCircle, AlertTriangle } from 'lucide-react';
 
 // コンポーネントのインポート
 import Notification from './components/Notification';
@@ -18,7 +17,7 @@ import LoanHistory from './components/LoanHistory';
 import LoanStatistics from './components/LoanStatistics';
 import CsvValidation from './components/CsvValidation';
 import Profile from './components/Profile';
-import RegisterItem from './components/RegisterItem'; // RegisterItem コンポーネントをインポート
+import RegisterItem from './components/RegisterItem';
 import './index.css';
 
 // --- 型定義 ---
@@ -44,8 +43,61 @@ function AppContents() {
   const [isWelcomeAnimationFading, setIsWelcomeAnimationFading] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
+  // ウェルカムアニメーション表示制御
+  const displayWelcomeAnimation = () => {
+    setShowWelcomeAnimation(true);
+    setIsWelcomeAnimationFading(false);
+    
+    setTimeout(() => {
+      setIsWelcomeAnimationFading(true);
+    }, 1700);
+    
+    setTimeout(() => {
+      setShowWelcomeAnimation(false);
+      setIsWelcomeAnimationFading(false);
+    }, 2000);
+  };
+
+  // AuthModal での認証成功時の処理
+  const handleAuthSuccess = (email: string, name?: string) => {
+    setUserEmail(email);
+    setWelcomeUserName(name || email);
+    setIsAuthModalOpen(false);
+    
+    // ウェルカムアニメーション表示
+    displayWelcomeAnimation();
+    
+    // アニメーション表示後に認証状態をtrueにする
+    setTimeout(() => {
+      setIsAuthenticated(true);
+    }, 500);
+  };
+
+  // ユーザーが認証されたときに実行する関数
+  const diagnoseDataAccess = async () => {
+    if (isAuthenticated) {
+      // 各テーブルの診断を実行
+      const itemsDiagnosis = await diagnoseSecurity('items');
+      const eventsDiagnosis = await diagnoseSecurity('events');
+      const controlDiagnosis = await diagnoseSecurity('control');
+      const resultDiagnosis = await diagnoseSecurity('result');
+      
+      console.log('Diagnosis Results:', {
+        items: itemsDiagnosis,
+        events: eventsDiagnosis,
+        control: controlDiagnosis,
+        result: resultDiagnosis
+      });
+      
+      // データが空の場合、アクセス権限の問題か、データがないかをチェック
+      if (itemsDiagnosis.success && itemsDiagnosis.data?.length === 0) {
+        console.log('No items records found. This could be due to RLS policy or empty table.');
+      }
+    }
+  };
+
+  // 認証状態を確認する副作用
   useEffect(() => {
-    // 認証状態を確認
     const checkAuthStatus = async () => {
       const session = await checkUser();
       setIsAuthenticated(!!session);
@@ -113,35 +165,12 @@ function AppContents() {
     };
   }, [userProfileImage]);
 
-  // ウェルカムアニメーション表示制御
-  const displayWelcomeAnimation = () => {
-    setShowWelcomeAnimation(true);
-    setIsWelcomeAnimationFading(false);
-    
-    setTimeout(() => {
-      setIsWelcomeAnimationFading(true);
-    }, 1700);
-    
-    setTimeout(() => {
-      setShowWelcomeAnimation(false);
-      setIsWelcomeAnimationFading(false);
-    }, 2000);
-  };
-
-  // AuthModal での認証成功時の処理
-  const handleAuthSuccess = (email: string, name?: string) => {
-    setUserEmail(email);
-    setWelcomeUserName(name || email);
-    setIsAuthModalOpen(false);
-    
-    // ウェルカムアニメーション表示
-    displayWelcomeAnimation();
-    
-    // アニメーション表示後に認証状態をtrueにする
-    setTimeout(() => {
-      setIsAuthenticated(true);
-    }, 500);
-  };
+  // 認証状態変化時にデータアクセス診断を実行
+  useEffect(() => {
+    if (isAuthenticated) {
+      diagnoseDataAccess();
+    }
+  }, [isAuthenticated]);
 
   // 認証状態確認中のローディング表示
   if (isLoadingAuth) {
@@ -232,7 +261,7 @@ function AppContents() {
           </Routes>
         </Layout>
       ) : (
-        // 非認証ユーザー向け - Layoutコンポーネントを使用
+        // 非認証ユーザー向け
         <Layout
           isAuthenticated={false}
           setShowAuthModal={setIsAuthModalOpen}

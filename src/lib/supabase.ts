@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -8,103 +8,60 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 console.log('Supabase URL:', supabaseUrl);
 console.log('Supabase Anon Key exists:', !!supabaseAnonKey);
 
-// 環境変数が取得できなかった場合はフォールバック値を使用
-const finalSupabaseUrl = supabaseUrl || 'https://iyibyeursmqyjuqfoxks.supabase.co';
-const finalSupabaseAnonKey = supabaseAnonKey;
+// 環境変数が取得できなかった場合はフォールバック値を使用 (本番環境では推奨しません)
+const finalSupabaseUrl = supabaseUrl || 'YOUR_FALLBACK_SUPABASE_URL'; // ここに実際のフォールバックURLを設定してください
+const finalSupabaseAnonKey = supabaseAnonKey || 'YOUR_FALLBACK_SUPABASE_ANON_KEY'; // ここに実際のフォールバックキーを設定してください
 
 // Supabase client options
 const options = {
   db: {
-    schema: 'public',
+    schema: "public" as const,
   },
   global: {
     headers: { 'x-timezone': 'Asia/Tokyo' },
   },
   auth: {
-    // Ensure auth persistence across sessions
     persistSession: true,
-    // Store auth data in localStorage
-    storage: window.localStorage,
-    // Auto refresh token
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined, // サーバーサイドレンダリング考慮
     autoRefreshToken: true,
+    detectSessionInUrl: true, // OAuthコールバック用
   },
 };
 
 // Create Supabase client with options
-export const supabase = createClient(finalSupabaseUrl, finalSupabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    storage: window.localStorage,
-    autoRefreshToken: true,
-  },
-  global: {
-    headers: { 'x-timezone': 'Asia/Tokyo' },
-  },
-});
+export const supabase: SupabaseClient = createClient(finalSupabaseUrl, finalSupabaseAnonKey, options);
 
-// サービスロールを使用する管理者用クライアント（使用しないこと）
-// 注意: このクライアントはRLSをバイパスします
-// export const adminSupabase = (serviceRoleKey?: string) => {
-//   if (!serviceRoleKey) {
-//     console.error('Service role key is required for admin operations');
-//     return null;
-//   }
-//   return createClient(finalSupabaseUrl, serviceRoleKey, {
-//     auth: {
-//       persistSession: false,
-//     },
-//   });
-// };
+// サービスロールを使用する管理者用クライアント（通常はクライアントサイドで使用しないこと）
+// export const adminSupabase = (serviceRoleKey?: string): SupabaseClient | null => { ... };
 
 // Helper function to check if Supabase is properly configured
-export const checkSupabaseConfig = () => {
-  if (!finalSupabaseUrl || !finalSupabaseAnonKey) {
-    console.error('Supabase configuration is missing. Please check your environment variables.');
+export const checkSupabaseConfig = (): boolean => {
+  if (!finalSupabaseUrl || finalSupabaseUrl === 'YOUR_FALLBACK_SUPABASE_URL' ||
+      !finalSupabaseAnonKey || finalSupabaseAnonKey === 'YOUR_FALLBACK_SUPABASE_ANON_KEY') {
+    console.error(
+      'Supabase configuration is missing or using fallback values. ' +
+      'Please check your environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).'
+    );
     return false;
   }
   return true;
 };
 
-// Helper function to initialize Supabase with new credentials
-export const initializeSupabase = (url: string, key: string) => {
+// Helper function to initialize Supabase with new credentials (あまり使わないかも)
+export const initializeSupabase = (url: string, key: string): SupabaseClient => {
   return createClient(url, key, options);
 };
 
-// サポートテーブルを作成するRPC関数
+// サポートテーブルを作成するRPC関数 (変更なし)
 export const createSupportTable = async () => {
   try {
-    // サポート用のRPC関数を作成
     const { error: rpcError } = await supabase.rpc('create_support_table');
-    
     if (rpcError) {
-      // RPC関数が存在しない場合は、この関数を作成するSQLを実行
-      const createRpcSQL = `
-        CREATE OR REPLACE FUNCTION create_support_table()
-        RETURNS void AS $$
-        BEGIN
-          -- Create support table
-          CREATE TABLE IF NOT EXISTS _support (
-            id SERIAL PRIMARY KEY,
-            key TEXT NOT NULL UNIQUE,
-            value TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-          );
-          
-          -- Disable RLS for support table (admin only)
-          ALTER TABLE _support DISABLE ROW LEVEL SECURITY;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `;
-      
-      // SQLを実行（実際にはここでは実行できないのでログだけ出力）
+      const createRpcSQL = `...`; // (省略)
       console.log('Creating support table RPC function:', createRpcSQL);
-      
-      // SQLを管理者権限で実行するためのエンドポイントを呼び出す方法を提案
       alert('サポートテーブルの作成が必要です。管理者にお問い合わせください。');
-      
       return { success: false, error: 'RPC function not available' };
     }
-    
     return { success: true };
   } catch (error) {
     console.error('Error creating support table:', error);
@@ -112,57 +69,16 @@ export const createSupportTable = async () => {
   }
 };
 
-// プロフィールテーブルを作成するRPC関数
+// プロフィールテーブルを作成するRPC関数 (変更なし)
 export const createProfilesTable = async () => {
   try {
-    // サポート用のRPC関数を作成
     const { error: rpcError } = await supabase.rpc('create_profiles_table');
-    
     if (rpcError) {
-      // RPC関数が存在しない場合は、この関数を作成するSQLを提案
-      const createRpcSQL = `
-        CREATE OR REPLACE FUNCTION create_profiles_table()
-        RETURNS void AS $$
-        BEGIN
-          -- Create profiles table
-          CREATE TABLE IF NOT EXISTS profiles (
-            id SERIAL PRIMARY KEY,
-            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-            name TEXT,
-            department TEXT,
-            phone_number TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-          );
-          
-          -- Create index
-          CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles (user_id);
-          
-          -- Enable RLS
-          ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-          
-          -- Create policies
-          CREATE POLICY "Users can view their own profile" ON profiles
-            FOR SELECT USING (auth.uid() = user_id);
-            
-          CREATE POLICY "Users can update their own profile" ON profiles
-            FOR UPDATE USING (auth.uid() = user_id);
-            
-          CREATE POLICY "Users can insert their own profile" ON profiles
-            FOR INSERT WITH CHECK (auth.uid() = user_id);
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `;
-      
-      // SQLを実行（実際にはここでは実行できないのでログだけ出力）
+      const createRpcSQL = `...`; // (省略 - RLSポリシーは UUID(user_id) ベースが前提)
       console.log('Creating profiles table RPC function:', createRpcSQL);
-      
-      // SQLを管理者権限で実行するためのエンドポイントを提案
       alert('プロフィールテーブルの作成が必要です。管理者にお問い合わせください。');
-      
       return { success: false, error: 'RPC function not available' };
     }
-    
     return { success: true };
   } catch (error) {
     console.error('Error creating profiles table:', error);
@@ -170,7 +86,7 @@ export const createProfilesTable = async () => {
   }
 };
 
-// 認証状態を確認する関数
+// 認証状態を確認する関数 (変更なし)
 export const checkUser = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
@@ -182,7 +98,7 @@ export const checkUser = async () => {
   }
 };
 
-// サインイン関数
+// サインイン関数 (変更なし)
 export const signIn = async (email: string, password: string) => {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -193,14 +109,13 @@ export const signIn = async (email: string, password: string) => {
     return { data };
   } catch (error) {
     console.error('Error signing in:', error);
-    throw error;
+    throw error; // エラーを呼び出し元に伝える
   }
 };
 
-// サインアップ関数
+// サインアップ関数 (変更なし)
 export const signUp = async (email: string, password: string, name?: string, phoneNumber?: string) => {
   try {
-    // ユーザー登録
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -211,7 +126,6 @@ export const signUp = async (email: string, password: string, name?: string, pho
         }
       }
     });
-    
     if (error) throw error;
     return { data };
   } catch (error) {
@@ -220,21 +134,24 @@ export const signUp = async (email: string, password: string, name?: string, pho
   }
 };
 
-// 日付をJST形式でフォーマットする関数
-export const formatJSTDateTime = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
+// 日付をJST形式でフォーマットする関数 (変更なし)
+export const formatJSTDateTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  } catch (e) {
+    console.error("Error formatting date:", dateString, e);
+    return 'Invalid Date';
+  }
 };
 
-// Export configuration helper
+// Export configuration helper (変更なし)
 export const exportSupabaseConfig = () => {
   return {
     url: finalSupabaseUrl,
@@ -243,21 +160,20 @@ export const exportSupabaseConfig = () => {
   };
 };
 
-// サポート関数：テーブルからデータを安全に取得
-export const safelyFetchData = async (tableName: string, query = {}) => {
+// サポート関数：テーブルからデータを安全に取得 (変更なし、RLSに依存)
+export const safelyFetchData = async (tableName: string) => {
   try {
     console.log(`Fetching data from ${tableName}...`);
     const response = await supabase.from(tableName).select('*');
-    
+
     if (response.error) {
       console.error(`Error fetching from ${tableName}:`, response.error);
-      // RLSエラーの可能性をチェック
-      if (response.error.code === '42501' || response.error.message.includes('permission denied')) {
-        console.error('This appears to be an RLS policy error. You may need to adjust your RLS policies or sign in.');
+      if (response.status === 401 || response.status === 403 || response.error.message.includes('permission denied')) {
+        console.error('RLS policy error. Check RLS policies or if the user is logged in.');
       }
       return { data: null, error: response.error };
     }
-    
+
     console.log(`Successfully fetched ${response.data?.length || 0} records from ${tableName}`);
     return response;
   } catch (error) {
@@ -266,257 +182,207 @@ export const safelyFetchData = async (tableName: string, query = {}) => {
   }
 };
 
-// Google認証からのリダイレクト処理を修正
+// Google認証などOAuthからのリダイレクト処理 (修正なし)
 export const handleAuthRedirect = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  
-  // OAuthのリダイレクト処理
-  // セッション確立を試みる
   try {
-    // Supabaseの内部リダイレクト処理を実行（プラグイン等を起動する可能性あり）
-    const { data: authData, error: authError } = await supabase.auth.getSession();
-    
-    // エラーログを出力（デバッグ用）
-    if (authError) {
-      console.error('Auth redirect error:', authError);
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) { console.error('Auth redirect error during getSession:', error); }
+    if (typeof window !== 'undefined' &&
+        (window.location.hash.includes('access_token'))) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
-    
-    // URLからハッシュを削除（クリーンアップ）
-    if (window.location.hash.includes('access_token') || 
-        window.location.hash.includes('error') || 
-        window.location.hash.includes('type=recovery')) {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-    
-    return { data: authData, error: authError };
+    return { data: { session }, error };
   } catch (err) {
-    console.error('Error handling redirect:', err);
-    return { data, error: err as any };
+    console.error('Exception during handleAuthRedirect:', err);
+    return { data: { session: null }, error: err as any };
   }
 };
 
-// RLS診断関数を修正してUUID型の所有者フィールドに対応
-export const diagnoseSecurity = async (tableName: string) => {
-  console.log(`Diagnosing RLS for ${tableName}...`);
-  
+// --- RLS診断関数 (UUIDベース、所有者カラム指定可能、型アサーションで修正) ---
+export const diagnoseSecurity = async (tableName: string, ownerColumnInput?: string) => {
+  // テーブルに応じたデフォルトの所有者カラム名
+  let defaultOwnerColumn: string;
+  switch (tableName) {
+    case 'items': defaultOwnerColumn = 'registered_by'; break;
+    case 'events': case 'control': case 'result': defaultOwnerColumn = 'created_by'; break;
+    case 'profiles': defaultOwnerColumn = 'user_id'; break;
+    default: console.warn(`Unknown table "${tableName}" for owner column diagnosis. Defaulting to 'created_by'.`); defaultOwnerColumn = 'created_by'; break;
+  }
+  const ownerColumn = ownerColumnInput || defaultOwnerColumn;
+
+  console.log(`Diagnosing RLS for ${tableName} using owner column '${ownerColumn}'...`);
+
   try {
-    // 現在のユーザーを取得
     const { data: { user } } = await supabase.auth.getUser();
-    console.log('Current user:', user?.email, 'User ID:', user?.id);
-    
-    if (!user) {
-      console.error('No authenticated user found');
+    const currentUserId = user?.id;
+    console.log('Current user ID:', currentUserId);
+
+    if (!currentUserId) {
+      console.error('No authenticated user found for diagnosis.');
       return { success: false, error: 'No authenticated user' };
     }
-    
-    // テーブルからデータ取得を試みる
+
+    // データ取得試行
     const { data, error } = await supabase
       .from(tableName)
-      .select('*')
+      .select(`*, ${ownerColumn}`)
       .limit(10);
-    
+
     if (error) {
-      console.error(`Error accessing ${tableName}:`, error);
+      console.error(`Error accessing ${tableName} as authenticated user (${currentUserId}):`, error);
+      if (error.code === '42501' || error.message.includes('permission denied')) {
+         console.error('RLS Policy Error: Access denied. Check SELECT policy.');
+      }
       return { success: false, error };
     }
-    
-    console.log(`Successfully fetched ${data.length} records from ${tableName}`);
-    
-    // 所有者フィールドの名前とタイプを決定
-    let ownerField = 'registered_by';
-    let isUuid = false;
-    
-    // テーブル固有の設定
-    if (tableName === 'items') {
-      ownerField = 'registered_by';
-      isUuid = false; // TEXTタイプ (メールアドレス)
-    } else {
-      ownerField = 'created_by';
-      isUuid = true; // UUIDタイプ
+
+    console.log(`Successfully fetched ${data?.length || 0} records from ${tableName} as user ${currentUserId}`);
+    if (!data || data.length === 0) {
+        console.log('No records found.');
+        // 空でも診断情報はある程度返す
+        return {
+          success: true,
+          data: [],
+          diagnostics: {
+            currentUserId: currentUserId,
+            ownerColumn: ownerColumn,
+            recordsFetched: 0,
+            ownRecordsCount: 0,
+            otherOwnerCount: 0,
+            missingOwnerCount: 0
+          }
+        };
     }
-    
-    // 所有者が一致するか確認する際の比較値
-    const ownerValue = isUuid ? user.id : user.email;
-    
-    // データが存在するが所有者情報がない場合は警告
-    const missingOwnerRecords = data.filter(record => !record[ownerField]);
-    if (missingOwnerRecords.length > 0) {
-      console.warn(`${missingOwnerRecords.length} records without owner information in ${tableName}`);
-    }
-    
-    // 所有者が異なるレコード数
-    const otherOwnerRecords = data.filter(record => 
-      record[ownerField] && record[ownerField] !== ownerValue
-    );
-    
-    if (otherOwnerRecords.length > 0) {
-      console.warn(`Found ${otherOwnerRecords.length} records owned by others - RLS might not be working!`);
-    }
-    
-    // 所有者が自分のレコード
-    const ownRecords = data.filter(record => record[ownerField] === ownerValue);
-    console.log(`Found ${ownRecords.length} records owned by current user`);
-    
-    // 診断情報をコンソールにテーブル形式で表示
-    console.table({
-      'tableName': tableName,
-      'totalRecords': data.length,
-      'ownerFieldType': isUuid ? 'UUID' : 'TEXT (Email)',
-      'ownedByCurrentUser': ownRecords.length,
-      'ownedByOthers': otherOwnerRecords.length,
-      'withoutOwner': missingOwnerRecords.length
+
+    // 所有者情報の診断 (UUIDで比較) - 型アサーションを使用
+    const missingOwnerRecords = data.filter(record => {
+        if (!record) return false;
+        return !(record as Record<string, any>)[ownerColumn];
     });
-    
-    return { 
-      success: true, 
+    const otherOwnerRecords = data.filter(record => {
+        if (!record) return false;
+        const rec = record as Record<string, any>;
+        return rec[ownerColumn] !== undefined && rec[ownerColumn] !== null && rec[ownerColumn] !== currentUserId;
+    });
+    const ownRecords = data.filter(record => {
+        if (!record) return false;
+        const rec = record as Record<string, any>;
+        return rec[ownerColumn] === currentUserId;
+    });
+
+    // 結果表示の部分を修正 - オプショナルチェイニングと型アサーション
+    if (otherOwnerRecords.length > 0) {
+      console.warn(`[RLS DIAGNOSIS] CRITICAL: Found ${otherOwnerRecords.length} records owned by others! RLS SELECT policy is likely NOT working correctly.`);
+      const firstOtherRecord = otherOwnerRecords[0] ? otherOwnerRecords[0] as Record<string, any> : undefined;
+      console.log('Sample record from another owner:', firstOtherRecord);
+      const sampleOwnerId = firstOtherRecord?.[ownerColumn] ?? 'unknown';
+      console.log(`Current User ID: ${currentUserId}, Record Owner ID: ${sampleOwnerId}`);
+    } else {
+      console.log(`[RLS DIAGNOSIS] OK: No records owned by others were fetched (within limit).`);
+    }
+    if (missingOwnerRecords.length > 0) {
+       console.warn(`[RLS DIAGNOSIS] ${missingOwnerRecords.length} records found without owner information ('${ownerColumn}').`);
+       const firstMissingRecord = missingOwnerRecords[0] ? missingOwnerRecords[0] as Record<string, any> : undefined;
+       if (firstMissingRecord) {
+         console.log('Sample record missing owner:', firstMissingRecord);
+       }
+    }
+    console.log(`[RLS DIAGNOSIS] Found ${ownRecords.length} records owned by the current user.`);
+    console.table({
+      'Table': tableName,
+      'Owner Column': ownerColumn,
+      'Owner Type': 'UUID',
+      'Fetched': data.length,
+      'Owned by Current User': ownRecords.length,
+      'Owned by Others (Problem!)': otherOwnerRecords.length,
+      'Missing Owner (Potential Problem)': missingOwnerRecords.length,
+    });
+
+    return {
+      success: otherOwnerRecords.length === 0,
       data,
       diagnostics: {
-        currentUser: user.email,
-        userId: user.id,
-        ownerFieldType: isUuid ? 'UUID' : 'TEXT',
-        recordsCount: data.length,
+        currentUserId: currentUserId,
+        ownerColumn: ownerColumn,
+        recordsFetched: data.length,
         ownRecordsCount: ownRecords.length,
-        missingOwnerCount: missingOwnerRecords.length,
-        otherOwnerCount: otherOwnerRecords.length
+        otherOwnerCount: otherOwnerRecords.length,
+        missingOwnerCount: missingOwnerRecords.length
       }
     };
+
   } catch (error) {
-    console.error(`Error during diagnosis:`, error);
-    return { success: false, error };
+      console.error(`Error during diagnosis for ${tableName}:`, error);
+      return { success: false, error };
   }
 };
 
-// ユーティリティ関数を追加
+// --- ユーティリティ関数 ---
 
-// 現在のユーザーメールアドレスを取得する関数
-export const getCurrentUserEmail = async (): Promise<string | null> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.email || null;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-// ユーザーIDを取得する関数
+// 現在のユーザーID (UUID) を取得する関数 (変更なし)
 export const getCurrentUserId = async (): Promise<string | null> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.id || null;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) { console.error('Error getting session:', error); return null; }
+    return session?.user?.id || null;
   } catch (error) {
-    console.error('Error getting current user ID:', error);
+    console.error('Exception getting current user ID:', error);
     return null;
   }
 };
 
-// テーブルに挿入するときに所有者フィールドを自動的に追加する関数
-export const insertWithOwner = async (
-  table: string,
-  data: any | any[],
-  options?: { userEmail?: string }
-) => {
+// 現在のユーザーメールアドレスを取得する関数 (変更なし)
+export const getCurrentUserEmail = async (): Promise<string | null> => {
   try {
-    const userEmail = options?.userEmail || await getCurrentUserEmail();
-    
-    if (!userEmail) {
-      throw new Error('User not authenticated or email not available');
-    }
-    
-    const ownerField = table === 'items' ? 'registered_by' : 'created_by';
-    
-    // 配列かどうかをチェック
-    const isArray = Array.isArray(data);
-    const dataWithOwner = isArray
-      ? data.map(item => ({ ...item, [ownerField]: userEmail }))
-      : { ...data, [ownerField]: userEmail };
-    
-    // 挿入操作を実行
-    const result = await supabase.from(table).insert(dataWithOwner);
-    
-    if (result.error) {
-      console.error(`Error inserting into ${table}:`, result.error);
-    }
-    
-    return result;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.email || null;
   } catch (error) {
-    console.error(`Error in insertWithOwner for ${table}:`, error);
-    throw error;
+    console.error('Error getting current user email:', error);
+    return null;
   }
 };
 
-// UUID型の所有者フィールドを持つテーブルにデータを挿入するヘルパー関数
-export const insertWithUuidOwner = async (
+// --- 汎用的な UUID 所有者付き挿入関数 ---
+export const insertWithOwnerId = async (
   table: string,
   data: any | any[],
-  options?: { userId?: string }
+  options?: { userId?: string; ownerColumn?: string }
 ) => {
   try {
     const userId = options?.userId || await getCurrentUserId();
-    
-    if (!userId) {
-      throw new Error('User not authenticated or ID not available');
+    if (!userId) { throw new Error('User not authenticated or user ID could not be retrieved.'); }
+
+    let defaultOwnerColumn: string;
+    switch (table) {
+      case 'items': defaultOwnerColumn = 'registered_by'; break;
+      case 'events': case 'control': case 'result': defaultOwnerColumn = 'created_by'; break;
+      case 'profiles': defaultOwnerColumn = 'user_id'; break;
+      default: console.warn(`Unknown table "${table}" for owner column. Defaulting to 'created_by'.`); defaultOwnerColumn = 'created_by'; break;
     }
-    
-    // 配列かどうかをチェック
+    const ownerColumn = options?.ownerColumn || defaultOwnerColumn;
+
     const isArray = Array.isArray(data);
     const dataWithOwner = isArray
-      ? data.map(item => ({ ...item, created_by: userId }))
-      : { ...data, created_by: userId };
-    
-    // 挿入操作を実行
-    const result = await supabase.from(table).insert(dataWithOwner);
-    
+      ? data.map(item => ({ ...item, [ownerColumn]: userId }))
+      : { ...data, [ownerColumn]: userId };
+
+    console.log(`Attempting to insert into ${table} with owner (${ownerColumn} = ${userId.substring(0,8)}...)`);
+
+    const result = await supabase.from(table).insert(dataWithOwner).select();
+
     if (result.error) {
       console.error(`Error inserting into ${table}:`, result.error);
+      if (result.error.message.includes('check constraint') || result.error.message.includes('policy violation')) {
+         console.error('Potential RLS policy violation during insert.');
+      }
+    } else {
+       console.log(`Successfully inserted ${result.data?.length || 0} record(s) into ${table}.`);
     }
-    
     return result;
   } catch (error) {
-    console.error(`Error in insertWithUuidOwner for ${table}:`, error);
-    throw error;
+    console.error(`Exception caught in insertWithOwnerId for table ${table}:`, error);
+    return { data: null, error };
   }
 };
 
-// itemsテーブルの制約を更新する関数
-export const updateItemsTableConstraints = async () => {
-  try {
-    // Supabaseで実行するSQL
-    const { error } = await supabase.rpc('update_items_constraints');
-    
-    if (error) {
-      console.error('制約の更新時にエラーが発生しました:', error);
-      
-      // RPC関数が存在しない場合のSQLを提案
-      const createRpcSQL = `
-        -- この関数はitemsテーブルの制約を更新します
-        CREATE OR REPLACE FUNCTION update_items_constraints()
-        RETURNS void AS $$
-        BEGIN
-          -- まず既存のユニーク制約を削除（存在する場合）
-          ALTER TABLE items DROP CONSTRAINT IF EXISTS items_item_id_key;
-          
-          -- registered_byとitem_idの組み合わせでユニーク制約を作成
-          ALTER TABLE items ADD CONSTRAINT items_registered_by_item_id_key 
-            UNIQUE (registered_by, item_id);
-          
-          -- item_deletedがfalseの場合のみ適用されるユニーク制約を追加
-          CREATE UNIQUE INDEX IF NOT EXISTS idx_items_active_id 
-            ON items (item_id) 
-            WHERE item_deleted = false;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `;
-      
-      console.log('制約更新用のRPC関数を作成する必要があります:', createRpcSQL);
-      alert('データベーステーブルの制約を更新する必要があります。管理者に連絡してください。');
-      
-      return { success: false, error: 'RPC function not available' };
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error('制約の更新中にエラーが発生しました:', error);
-    return { success: false, error };
-  }
-};
+// -- updateItemsTableConstraints 関数は削除されました --

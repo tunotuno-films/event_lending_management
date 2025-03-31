@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase ,getCurrentUserId , formatJSTDateTime } from '../lib/supabase';
 import { 
   Barcode, 
   LayoutList, 
@@ -45,6 +45,8 @@ interface ResultItem {
   end_datetime: string | null;
   item_id: string;
   event_id: string;
+  item_id_ref?: number;
+  event_id_ref?: number;
   items?: {
     name: string;
   } | null;
@@ -56,6 +58,7 @@ interface ResultItem {
 // mostBorrowed の型定義を追加
 interface MostBorrowedItem {
   item_id: string;
+  item_id_ref?: number;
   items?: {
     name?: string;
     image?: string;
@@ -67,6 +70,51 @@ interface DashboardProps {
   setShowAuthModal?: (show: boolean) => void;
   setAuthMode?: (mode: 'signin' | 'signup') => void;
 }
+
+// カウントアップアニメーション用のカスタムフック
+function useCountUp(end: number, duration: number = 1000) {
+  const [count, setCount] = useState(0);
+  const countRef = useRef(0);
+  const timeRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    countRef.current = 0;
+    setCount(0);
+    
+    if (end === 0) return;
+    
+    const startTime = Date.now();
+    const step = () => {
+      const currentTime = Date.now();
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      
+      countRef.current = Math.floor(progress * end);
+      setCount(countRef.current);
+      
+      if (progress < 1) {
+        timeRef.current = requestAnimationFrame(step);
+      } else {
+        setCount(end); // 確実に最終値にする
+      }
+    };
+    
+    timeRef.current = requestAnimationFrame(step);
+    
+    return () => {
+      if (timeRef.current) {
+        cancelAnimationFrame(timeRef.current);
+      }
+    };
+  }, [end, duration]);
+  
+  return count;
+}
+
+// アニメーション表示用のコンポーネント
+const AnimatedCounter: React.FC<{value: number, duration?: number}> = ({ value, duration = 1000 }) => {
+  const count = useCountUp(value, duration);
+  return <>{count.toLocaleString()}</>;
+};
 
 // コンポーネント定義を修正
 const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) => {
@@ -94,18 +142,15 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
     fetchDashboardData();
     fetchUserProfile();
     
-    // 認証状態の変更を監視するリスナーを追加
+    // 認証状態の変更を監視するリスナー
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // ログアウト時や認証状態の変更時に実行
         setIsAuthenticated(!!session);
         
         if (session) {
-          // ログイン時
           fetchUserProfile();
           fetchDashboardData();
         } else {
-          // ログアウト時
           setUserProfile(null);
           setStats({
             itemsCount: 0,
@@ -121,24 +166,53 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
       }
     );
 
-    // クリーンアップ関数でリスナーを解除
+    // テーブル変更のリアルタイムサブスクリプションを追加
+    const controlSubscription = supabase
+      .channel('control-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'control' }, 
+        () => {
+          console.log('control table changed, refreshing dashboard data');
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+      
+    const resultSubscription = supabase
+      .channel('result-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'result' }, 
+        () => {
+          console.log('result table changed, refreshing dashboard data');
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    // 定期的に更新するタイマーを追加（オプション）
+    const refreshInterval = setInterval(() => {
+      if (isAuthenticated) {
+        fetchDashboardData();
+      }
+    }, 60000); // 1分ごとに更新
+
+    // クリーンアップ関数でリスナーとサブスクリプションを解除
     return () => {
       if (authListener && authListener.subscription) {
         authListener.subscription.unsubscribe();
       }
+      
+      controlSubscription.unsubscribe();
+      resultSubscription.unsubscribe();
+      clearInterval(refreshInterval);
     };
-  }, []);
+  }, [isAuthenticated]); // isAuthenticatedが変わったときだけ再実行
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
-      
-      // 認証状態を確認
-      const { data: { session } } = await supabase.auth.getSession();
-      const isAuthenticated = !!session;
-      
-      // 非認証時は最小限のデータのみ表示（またはデモデータを表示）
-      if (!isAuthenticated) {
+      // 認証チェック
+      const userId = await getCurrentUserId();
+      if (!isAuthenticated || !userId) {
         setStats({
           itemsCount: 0,
           eventsCount: 0,
@@ -152,6 +226,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         setLoading(false);
         return;
       }
+      
+      // タイムスタンプパラメータを追加してキャッシュを防ぐ
+      const timestamp = new Date().getTime();
       
       // アイテム総数を取得
       const { count: itemsCount, error: itemsError } = await supabase
@@ -170,36 +247,69 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         .select('*', { count: 'exact', head: true })
         .eq('status', true);
       
-      // 完了済み貸出数を取得
+      // 完了済み貸出数を取得 - end_datetimeを使用
       const { count: completedLoansCount, error: completedLoansError } = await supabase
         .from('result')
         .select('*', { count: 'exact', head: true })
         .not('end_datetime', 'is', null);
       
-      // 要返却アイテム数を取得
-      const { count: pendingReturns, error: pendingReturnsError } = await supabase
-        .from('control')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', true);
-      
-      // よく借りられるアイテムのTOP5を取得
+      // よく借りられるアイテムのTOP5を取得 - 正しいリレーションカラムを使用
       const { data: mostBorrowed, error: mostBorrowedError } = await supabase
         .from('result')
         .select(`
           item_id,
-          items:item_id (name, image)
+          items:item_id_ref(name, image)
         `)
         .limit(100);
       
+      // 最近のアクティビティを取得 - 正しいリレーションカラムを使用
+      const { data: recentResults, error: recentResultsError } = await supabase
+        .from('result')
+        .select(`
+          result_id,
+          start_datetime,
+          end_datetime,
+          item_id,
+          event_id,
+          items:item_id_ref(name),
+          events:event_id_ref(name)
+        `)
+        .order('start_datetime', { ascending: false })
+        .limit(10);
+
+      if (mostBorrowedError) {
+        console.error('Error fetching most borrowed items:', mostBorrowedError);
+        // リレーションに問題がある場合の修正案を表示
+        console.log('Trying alternative query format for mostBorrowed...');
+        // 構造の確認
+        const { data: sampleResult } = await supabase
+          .from('result')
+          .select('*')
+          .limit(1);
+        console.log('Sample result record:', sampleResult);
+      }
+
+      if (recentResultsError) {
+        console.error('Error fetching recent activities:', recentResultsError);
+        // リレーションに問題がある場合の修正案を表示
+        console.log('Trying alternative query format for recentResults...');
+        // 構造の確認
+        const { data: sampleResult } = await supabase
+          .from('result')
+          .select('*')
+          .limit(1);
+        console.log('Sample result record:', sampleResult);
+      }
+
+      // データ処理 - 正しいリレーションと構造を反映するよう修正
       let mostBorrowedItems: Array<{id: string, name: string, image: string, count: number}> = [];
       if (mostBorrowed) {
-        // アイテムごとの貸出回数をカウント
         const itemCounts: Record<string, {count: number, name: string, image: string | null}> = {};
         (mostBorrowed as MostBorrowedItem[]).forEach(item => {
           const id = item.item_id;
-          // 明示的な型アサーションとオプショナルチェーン
+          // リレーショナルデータが正しい形式で取得できているか確認
           const name = item.items?.name || '不明な物品';
-          const image = item.items?.image || null; // 画像URLはnullの可能性がある
+          const image = item.items?.image || null;
           
           if (!itemCounts[id]) {
             itemCounts[id] = { count: 0, name, image };
@@ -207,76 +317,61 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           itemCounts[id].count++;
         });
         
-        // カウント数でソートして上位5件を取得
         mostBorrowedItems = Object.entries(itemCounts)
           .map(([id, { count, name, image }]) => ({ 
             id, 
             name, 
-            image: image || '', // nullの場合は空文字列を設定
+            image: image || '', 
             count 
           }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5);
       }
       
-      // 最近のアクティビティを取得 - 両方のアクティビティを表示するよう修正
-      const { data: recentResults, error: recentResultsError } = await supabase
-        .from('result')
-        .select(`
-          result_id,
-          start_datetime,
-          end_datetime,
-          items:item_id (name),
-          events:event_id (name)
-        `)
-        .order('start_datetime', { ascending: false })
-        .limit(10); // 取得数を増やして加工後に絞り込む
-
-      // nullチェックと型の安全な処理
       let recentActivity: Array<{id: number, action: string, item: string, time: string, user: string}> = [];
-
-      if (recentResults) {
-        // 貸出と返却を別々のアクティビティとして処理
-        const activities: Array<{id: number, action: string, item: string, time: string, user: string}> = [];
-        
-        (recentResults as any[]).forEach(loan => {
-          // 貸出アクティビティを追加
-          activities.push({
-            id: loan.result_id * 10, // ユニークIDを確保するため乗算
-            action: '貸出',
-            item: loan.items?.name || '不明な物品',
-            time: new Date(loan.start_datetime).toLocaleString('ja-JP'),
-            user: loan.events?.name || `未指定のイベント`
-          });
+      if (recentResults && recentResults.length > 0) {
+        recentActivity = recentResults.map(result => {
+          const actionType = result.end_datetime ? '返却' : '貸出';
           
-          // 返却済みなら返却アクティビティも追加
-          if (loan.end_datetime) {
-            activities.push({
-              id: loan.result_id * 10 + 1, // 貸出と区別するため+1
-              action: '返却',
-              item: loan.items?.name || '不明な物品',
-              time: new Date(loan.end_datetime).toLocaleString('ja-JP'),
-              user: loan.events?.name || `未指定のイベント`
-            });
+          // リレーショナルデータの正しい構造を反映
+          let itemName = '不明な物品';
+          if (result.items) {
+            // 配列の場合
+            if (Array.isArray(result.items) && result.items.length > 0 && result.items[0]?.name) {
+              itemName = result.items[0].name;
+            } 
+            // リレーショナル形式の場合
+            else if (typeof result.items === 'object' && 'name' in result.items && typeof result.items.name === 'string') {
+              itemName = result.items.name;
+            }
           }
+          
+          let eventName = '不明なイベント';
+          if (result.events) {
+            if (Array.isArray(result.events) && result.events.length > 0 && result.events[0]?.name) {
+              eventName = result.events[0].name;
+            } else if (typeof result.events === 'object' && 'name' in result.events && typeof result.events.name === 'string') {
+              eventName = result.events.name;
+            }
+          }
+            
+          return {
+            id: result.result_id,
+            action: actionType,
+            item: itemName,
+            time: formatJSTDateTime(actionType === '貸出' ? result.start_datetime : result.end_datetime),
+            user: eventName
+          };
         });
-        
-        // 日時で新しい順にソートして上位5件を取得
-        recentActivity = activities
-          .sort((a, b) => {
-            const dateA = new Date(a.time);
-            const dateB = new Date(b.time);
-            return dateB.getTime() - dateA.getTime();
-          })
-          .slice(0, 5);
       }
       
-      // ユーザー数を取得
-      // 実際のユーザー数取得ロジックに置き換える必要があります
-      // 仮にSupabaseのユーザー数を取得
+      // プロファイル数を取得
       const { count: totalUsers = 0 } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
+      
+      // 返却待ちアイテム数
+      const pendingReturns = activeLoansCount || 0;
       
       setStats({
         itemsCount: itemsCount || 0,
@@ -284,7 +379,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         activeLoansCount: activeLoansCount || 0,
         completedLoansCount: completedLoansCount || 0,
         totalUsers: totalUsers || 0,
-        pendingReturns: pendingReturns || 0,
+        pendingReturns: pendingReturns,
         mostBorrowedItems,
         recentActivity
       });
@@ -294,15 +389,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
     } finally {
       setLoading(false);
     }
-  };
-
-  // ユーザープロフィール情報を取得する関数を追加
+  }, [isAuthenticated]);
+  
   const fetchUserProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // ユーザー情報を設定
         setUserProfile({
           name: user.user_metadata?.name || 
                 user.user_metadata?.full_name || 
@@ -310,20 +403,33 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           email: user.email || '',
           avatar_url: user.user_metadata?.avatar_url || null
         });
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
     }
   };
+  
+  useEffect(() => {
+    // 貸出・返却操作を監視するイベントリスナー
+    const handleLoanStatusChange = () => {
+      console.log('Loan status changed, refreshing dashboard');
+      fetchDashboardData();
+    };
+  
+    window.addEventListener('loan-status-changed', handleLoanStatusChange);
+  
+    return () => {
+      window.removeEventListener('loan-status-changed', handleLoanStatusChange);
+    };
+  }, [fetchDashboardData]);
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ヘッダー部分を修正：フレックスボックスの方向をスマホでは縦方向に */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">ダッシュボード</h1>
           
-          {/* 認証済みの場合のみプロフィール情報を表示 */}
           {isAuthenticated && userProfile && (
             <div className="bg-white shadow rounded-lg p-4 flex items-center self-end sm:self-auto">
               <div className="mr-3">
@@ -349,7 +455,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
             </div>
           )}
           
-          {/* 非認証時にはログインプロモーションを表示 */}
           {!isAuthenticated && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full sm:w-auto">
               <div className="flex items-center">
@@ -381,7 +486,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           </div>
         ) : (
           <>
-            {/* 主要指標 - 認証済みユーザーにのみ表示 */}
             {isAuthenticated && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -394,7 +498,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">登録物品数</dt>
                           <dd className="flex items-baseline">
-                            <div className="text-2xl font-semibold text-gray-900">{stats.itemsCount}</div>
+                            <div className="text-2xl font-semibold text-gray-900">
+                              <AnimatedCounter value={stats.itemsCount} />
+                            </div>
                           </dd>
                         </dl>
                       </div>
@@ -420,7 +526,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">イベント数</dt>
                           <dd className="flex items-baseline">
-                            <div className="text-2xl font-semibold text-gray-900">{stats.eventsCount}</div>
+                            <div className="text-2xl font-semibold text-gray-900">
+                              <AnimatedCounter value={stats.eventsCount} />
+                            </div>
                           </dd>
                         </dl>
                       </div>
@@ -446,7 +554,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">貸出中アイテム</dt>
                           <dd className="flex items-baseline">
-                            <div className="text-2xl font-semibold text-gray-900">{stats.activeLoansCount}</div>
+                            <div className="text-2xl font-semibold text-gray-900">
+                              <AnimatedCounter value={stats.activeLoansCount} />
+                            </div>
                           </dd>
                         </dl>
                       </div>
@@ -472,7 +582,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">累計貸出回数</dt>
                           <dd className="flex items-baseline">
-                            <div className="text-2xl font-semibold text-gray-900">{stats.completedLoansCount}</div>
+                            <div className="text-2xl font-semibold text-gray-900">
+                              <AnimatedCounter value={stats.completedLoansCount} />
+                            </div>
                           </dd>
                         </dl>
                       </div>
@@ -490,20 +602,17 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
               </div>
             )}
             
-            {/* 主な機能へのショートカット - 全てのユーザーに表示 */}
             <div className="bg-white shadow rounded-lg mb-8">
               <div className="px-4 py-5 sm:px-6">
                 <h2 className="text-lg font-medium text-gray-900">機能</h2>
               </div>
               <div className="border-t border-gray-200">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 p-4">
-                  {/* 1行目: 物品とイベント関連の5機能 */}
                   <Link to="/item/regist" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
                     <Package className="h-8 w-8 text-blue-500 mb-2" />
                     <span className="text-sm text-gray-700">物品登録</span>
                   </Link>
                   
-                  {/* 以下のボタンは未ログイン時にグレーアウト */}
                   {isAuthenticated ? (
                     <Link to="/item/list" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
                       <LayoutList className="h-8 w-8 text-blue-500 mb-2" />
@@ -580,7 +689,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                     </div>
                   )}
                   
-                  {/* 2行目: 貸出関連の3機能 */}
                   {isAuthenticated ? (
                     <Link to="/loaning/control" className="flex flex-col items-center p-4 hover:bg-blue-50 rounded-lg transition-colors">
                       <Barcode className="h-8 w-8 text-blue-500 mb-2" />
@@ -641,27 +749,22 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
               </div>
             </div>
             
-            {/* データ可視化セクション - 人気物品ランキングと最近のアクティビティ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* よく借りられる物品カード - 常に表示 */}
               <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                   <h2 className="text-lg font-medium text-gray-900">人気物品ランキング</h2>
                   <BarChart2 className="h-6 w-6 text-gray-400" />
                 </div>
                 <div className="border-t border-gray-200 flex-grow">
-                  {/* データコンテナに固定高さではなくフレックス成長を設定 */}
                   <div className="h-full">
                     {isAuthenticated && stats.mostBorrowedItems.length > 0 ? (
                       <div className="p-4 space-y-3">
                         {stats.mostBorrowedItems.map((item, index) => (
                           <div key={item.id} className="flex items-center py-2">
-                            {/* 順位表示 - 右側の余白を増やす */}
                             <div className="font-bold text-xl text-gray-400 w-10 text-center mr-2">
                               {index + 1}
                             </div>
                             
-                            {/* 画像表示部分 - 両側の余白を増やす */}
                             <div className="mx-3 h-12 w-12 flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center bg-white">
                               {item.image ? (
                                 <img 
@@ -676,13 +779,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                               )}
                             </div>
                             
-                            {/* テキスト情報部分 - 左側の余白を増やす */}
                             <div className="ml-3 flex-1">
                               <div className="font-medium text-gray-900">{item.name}</div>
                               <div className="text-sm text-gray-500">貸出回数: {item.count}回</div>
                             </div>
                             
-                            {/* 「最も人気」バッジ */}
                             {index === 0 ? (
                               <div className="flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 最も人気
@@ -744,7 +845,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                 </div>
               </div>
               
-              {/* 最近のアクティビティカード - 同じ構造で統一 */}
               {isAuthenticated ? (
                 <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                   <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
@@ -799,7 +899,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                   </div>
                 </div>
               ) : (
-                // 未ログイン時の「最近のアクティビティ」カードのプレースホルダー
                 <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
                   <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                     <h2 className="text-lg font-medium text-gray-900">最近のアクティビティ</h2>

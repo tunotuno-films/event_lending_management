@@ -1,6 +1,6 @@
     import React, { useState, useEffect } from 'react';
     import { useNavigate } from 'react-router-dom';
-    import { supabase } from '../lib/supabase';
+    import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase';
     import { Barcode, StopCircle, X, AlertTriangle } from 'lucide-react';
     import Notification from './Notification';
     import { useZxing } from 'react-zxing';
@@ -245,54 +245,26 @@
         }
 
         try {
-        // バーコードの重複チェックを現在のユーザーに限定するように修正
+        // バーコードの重複チェック
         if (formData.barcode) {
-            // ユーザーIDを取得
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (!user || !user.id) {
-            setNotification({
-                show: true,
-                message: 'ユーザー情報が取得できません。再ログインしてください。',
-                type: 'error'
-            });
-            return false;
-            }
-            
-            // 自分が登録した同じitem_idのアイテムがないか確認
             const { data: existingItem } = await supabase
             .from('items')
             .select('item_id')
             .eq('item_id', formData.barcode)
-            .eq('registered_by', user.id)  // 自分が登録したものだけをチェック
             .eq('item_deleted', false)
             .single();
 
             if (existingItem) {
             setNotification({
                 show: true,
-                message: 'あなたは既にこの物品IDを登録しています',
+                message: '既にデータが登録されています',
                 type: 'error'
             });
             return false;
             }
-            
-            // アクティブな（削除されていない）同じitem_idがあるか全体で確認
-            const { data: existingActiveItem } = await supabase
-            .from('items')
-            .select('item_id')
-            .eq('item_id', formData.barcode)
-            .eq('item_deleted', false)
-            .single();
-            
-            if (existingActiveItem) {
-            // 警告を表示するが、必要に応じて登録を続行できるようにする
-            if (!confirm('この物品IDは他のユーザーによって既に登録されています。それでも登録しますか？')) {
-                return false;
-            }
-            }
         }
 
+        // 画像アップロード処理
         const file = formData.image;
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
@@ -313,36 +285,24 @@
         const finalGenre = formData.genre === 'その他' ? formData.customGenre : formData.genre;
         const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
 
-        // ユーザーIDを取得（UUIDを取得）
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user || !user.id) {
-            setNotification({
-            show: true,
-            message: 'ユーザー情報が取得できません。再ログインしてください。',
-            type: 'error'
-            });
-            return false;
-        }
-
-        // registered_byフィールドにはUUID型のユーザーIDを設定
-        const { error: insertError } = await supabase
-            .from('items')
-            .insert({
+        // 新しい関数を使用して登録
+        const { data: insertedItem, error: insertError } = await insertWithOwnerId(
+            'items',
+            {
             item_id: formData.barcode || null,
             name: formData.itemName,
             image: publicUrl,
             genre: finalGenre,
             manager: finalManager,
-            registered_by: user.id, // メールアドレスではなくUUIDを使用
-            registered_date: new Date().toISOString()
-            });
+            registered_date: new Date().toISOString(),
+            item_deleted: false
+            }
+        );
 
         if (insertError) {
             throw insertError;
         }
 
-        // 成功時の処理
         setNotification({
             show: true,
             message: '登録が完了しました',
@@ -355,9 +315,6 @@
 
         // フォームとプレビューをリセット
         resetForm();
-
-        // 新しいデータを反映するために既存データを再取得
-        fetchExistingData();
         
         return true;
         } catch (error) {

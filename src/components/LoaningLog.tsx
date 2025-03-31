@@ -11,9 +11,15 @@ interface LoanRecord {
   result_id: number;
   event_id: string;
   item_id: string;
+  event_id_ref?: number;
+  item_id_ref?: number;
   start_datetime: string;
   end_datetime: string | null;
-  item: {
+  item?: {
+    name: string;
+    image: string;
+  };
+  items?: {
     name: string;
     image: string;
   };
@@ -86,7 +92,6 @@ export default function LoaningLog() {
 
   const fetchEvents = async () => {
     try {
-      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -114,17 +119,49 @@ export default function LoaningLog() {
 
   const fetchLoanRecords = async () => {
     try {
+      const { data: basicData, error: basicError } = await supabase
+        .from('result')
+        .select('*')
+        .eq('event_id', selectedEventId)
+        .limit(1);
+      
+      if (basicError) {
+        console.error('基本クエリエラー:', basicError);
+        throw basicError;
+      }
+      
+      console.log('基本クエリ結果（構造確認）:', basicData);
+      
       const { data, error } = await supabase
         .from('result')
         .select(`
           *,
-          item:items(name, image)
+          items:item_id_ref(name, image)
         `)
         .eq('event_id', selectedEventId)
         .order('start_datetime', { ascending: false });
 
-      if (error) throw error;
-      setLoanRecords(data || []);
+      if (error) {
+        console.error('リレーショナルクエリエラー:', error);
+        throw error;
+      }
+
+      console.log('取得したデータ:', data);
+      
+      const formattedRecords = (data || []).map(record => {
+        const itemInfo = record.items ? 
+          (Array.isArray(record.items) ? record.items[0] : record.items) : null;
+        
+        return {
+          ...record,
+          item: itemInfo || {
+            name: '不明なアイテム',
+            image: null
+          }
+        };
+      });
+
+      setLoanRecords(formattedRecords);
     } catch (error) {
       console.error('Error fetching loan records:', error);
       setNotification({
@@ -165,7 +202,6 @@ export default function LoaningLog() {
     if (!selectedEventId) return;
 
     try {
-      // ユーザーIDを取得して削除操作に使用
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user || !user.id) {
@@ -177,7 +213,6 @@ export default function LoaningLog() {
         return;
       }
 
-      // 60秒未満の貸出を検出
       const shortLoans = loanRecords.filter(record => {
         if (!record.end_datetime) return false;
         const start = new Date(record.start_datetime).getTime();
@@ -195,8 +230,6 @@ export default function LoaningLog() {
         return;
       }
 
-      // RLSポリシーに従って削除操作
-      // created_by = user.idの条件はRLSポリシーによって自動適用される
       const { error } = await supabase
         .from('result')
         .delete()
@@ -205,7 +238,6 @@ export default function LoaningLog() {
 
       if (error) throw error;
 
-      // 記録を再取得
       await fetchLoanRecords();
 
       setNotification({
@@ -226,13 +258,24 @@ export default function LoaningLog() {
   const downloadCSV = () => {
     if (loanRecords.length === 0) return;
 
-    const headers = ['物品ID', '物品名', '貸出時間', '返却時間'];
-    const csvData = loanRecords.map(record => [
-      record.item_id,
-      record.item.name,
-      formatJSTDateTime(record.start_datetime),
-      record.end_datetime ? formatJSTDateTime(record.end_datetime) : '未返却'
-    ]);
+    const headers = ['物品ID', '物品名', '貸出時間', '返却時間', '貸出時間(秒)'];
+    const csvData = loanRecords.map(record => {
+      let durationInSeconds = '-';
+      
+      if (record.start_datetime && record.end_datetime) {
+        const start = new Date(record.start_datetime).getTime();
+        const end = new Date(record.end_datetime).getTime();
+        durationInSeconds = ((end - start) / 1000).toFixed(0);
+      }
+      
+      return [
+        record.item_id,
+        record.item?.name || '不明なアイテム',
+        formatJSTDateTime(record.start_datetime),
+        record.end_datetime ? formatJSTDateTime(record.end_datetime) : '未返却',
+        durationInSeconds
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -242,7 +285,7 @@ export default function LoaningLog() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `loan_history_${selectedEventId}_${new Date().toISOString()}.csv`;
+    link.download = `loan_history_${selectedEventId}_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -345,18 +388,24 @@ export default function LoaningLog() {
                   <tr key={record.result_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                        <img
-                          src={record.item.image || 'https://via.placeholder.com/150'}
-                          alt={record.item.name}
-                          className="max-h-full max-w-full object-contain"
-                        />
+                        {record.item?.image ? (
+                          <img
+                            src={record.item.image}
+                            alt={record.item.name || 'アイテム画像'}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                            <span className="text-xs text-gray-400">画像なし</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-mono">{record.item_id}</div>
+                      <div className="text-sm font-mono">{record.item_id || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{record.item.name}</div>
+                      <div className="text-sm">{record.item?.name || '不明なアイテム'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">

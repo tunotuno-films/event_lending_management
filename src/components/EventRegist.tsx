@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, insertWithOwnerId } from '../lib/supabase';
 import { AlertCircle, X } from 'lucide-react';
 
 interface NotificationProps {
@@ -55,66 +55,101 @@ export default function EventRegist() {
     type: 'success'
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const initialEventFormData = {
+    eventId: '',
+    name: ''
+  };
+
+  const fetchEvents = async () => {
+    // Fetch events logic here
+  };
+
+  const createEvent = async (eventData: typeof initialEventFormData) => {
     try {
-      // Check if event ID already exists
+      setIsSubmitting(true);
+
+      // 同じevent_idが既に存在するか確認
       const { data: existingEvents, error: checkError } = await supabase
         .from('events')
         .select('event_id')
-        .eq('event_id', formData.eventId);
+        .eq('event_id', eventData.eventId)
+        .eq('event_deleted', false);
 
-      if (checkError) throw checkError;
+      if (checkError) {
+        throw checkError;
+      }
 
+      // 既存のイベントが見つかった場合はエラー
       if (existingEvents && existingEvents.length > 0) {
         setNotification({
           show: true,
-          message: 'このイベントIDは既に使用されています',
+          message: `イベントID "${eventData.eventId}" は既に使用されています`,
           type: 'error'
         });
-        return;
+        return false;
       }
 
-      // ユーザーのセッション情報を取得
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      
-      if (!user || !user.id) {
-        setNotification({
-          show: true,
-          message: 'ユーザー情報が取得できません。再ログインしてください。',
-          type: 'error'
-        });
-        return;
-      }
-
-      // UUIDを使用してイベントを登録
-      const { error } = await supabase
-        .from('events')
-        .insert({
-          event_id: formData.eventId,
-          name: formData.name,
-          created_by: user.id  // ユーザーのUUIDを設定
-        });
+      // 重複がなければ新規登録
+      const { data, error } = await insertWithOwnerId(
+        'events',
+        {
+          event_id: eventData.eventId,  // event_idカラム
+          name: eventData.name,         // nameカラム
+          event_deleted: false          // event_deletedカラム
+        }
+      );
 
       if (error) throw error;
 
       setNotification({
         show: true,
-        message: 'イベントを登録しました',
+        message: 'イベントが正常に作成されました',
         type: 'success'
       });
 
-      setFormData({
-        eventId: '',
-        name: ''
+      setFormData(initialEventFormData);
+      fetchEvents();
+      return true;
+    } catch (error) {
+      console.error('イベント作成エラー:', error);
+      
+      let errorMessage = 'イベント作成中にエラーが発生しました';
+      
+      // Supabaseエラーメッセージがある場合は表示
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage += `: ${String(error.message)}`;
+      }
+      
+      setNotification({
+        show: true,
+        message: errorMessage,
+        type: 'error'
       });
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const success = await createEvent(formData);
+      if (success) {
+        setNotification({
+          show: true,
+          message: 'イベントを登録しました',
+          type: 'success'
+        });
+      }
     } catch (err: unknown) {
       console.error('Error registering event:', err);
-      
+
       let errorMessage = 'Unknown error occurred';
-      
+
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (typeof err === 'object' && err !== null && 'message' in err) {
@@ -122,7 +157,7 @@ export default function EventRegist() {
       } else if (typeof err === 'string') {
         errorMessage = err;
       }
-      
+
       setNotification({
         show: true,
         message: `登録中にエラーが発生しました: ${errorMessage}`,
@@ -157,7 +192,7 @@ export default function EventRegist() {
             required
           />
         </div>
-
+        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             イベント名
@@ -176,8 +211,9 @@ export default function EventRegist() {
           <button
             type="submit"
             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+            disabled={isSubmitting}
           >
-            登録
+            {isSubmitting ? '登録中...' : '登録'}
           </button>
         </div>
       </form>

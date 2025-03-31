@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
 
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+
 interface Item {
   item_id: string;
   name: string;
@@ -195,9 +197,10 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             </label>
             <div className="flex items-center gap-4">
               <img
-                src={item.image || 'https://via.placeholder.com/150'}
+                src={getItemImageUrl(item.image)}
                 alt={item.name}
                 className="h-20 w-20 object-cover rounded-lg"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
               />
               <input
                 type="file"
@@ -296,6 +299,22 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   );
 };
 
+// 画像URLのヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return DEFAULT_IMAGE;
+  
+  // 空文字やundefinedの場合
+  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
+  
+  // 有効なURLでない場合
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
+};
+
 export default function ItemList() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -344,7 +363,7 @@ export default function ItemList() {
         .from('items')
         .update({
           name: updatedItem.name,
-          image: updatedItem.image,
+          image: updatedItem.image || null, // 空文字列の場合はnullに
           genre: updatedItem.genre,
           manager: updatedItem.manager
         })
@@ -502,9 +521,10 @@ export default function ItemList() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                       <img
-                        src={item.image || 'https://via.placeholder.com/150'}
+                        src={getItemImageUrl(item.image)}
                         alt={item.name}
                         className="max-h-full max-w-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                       />
                     </div>
                   </td>

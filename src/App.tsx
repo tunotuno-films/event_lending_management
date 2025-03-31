@@ -28,6 +28,10 @@ interface CsvItem {
   errors: string[];
 }
 
+interface CsvValidationProps {
+  csvData: CsvItem[]; // 受け取るCSVデータの型を定義（パース済みの想定）
+}
+
 // AppContents コンポーネント - Router 内で実行される部分
 function AppContents() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -281,12 +285,10 @@ function AppContents() {
             {/* その他のパスは変更なし */}
             <Route path="/csv-validation" element={
               <CsvValidation 
-                csvData={csvData} 
-                setCsvData={setCsvData}
-                userEmail={userEmail}
+                csvData={csvData}
               />
             } />
-            <Route path="/profile" element={<Profile userEmail={userEmail} />} />
+            {/* Catch all unknown routes */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

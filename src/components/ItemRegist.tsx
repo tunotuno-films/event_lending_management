@@ -245,22 +245,51 @@
         }
 
         try {
-        // バーコードの重複チェック
+        // バーコードの重複チェックを現在のユーザーに限定するように修正
         if (formData.barcode) {
+            // ユーザーIDを取得
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user || !user.id) {
+            setNotification({
+                show: true,
+                message: 'ユーザー情報が取得できません。再ログインしてください。',
+                type: 'error'
+            });
+            return false;
+            }
+            
+            // 自分が登録した同じitem_idのアイテムがないか確認
             const { data: existingItem } = await supabase
             .from('items')
             .select('item_id')
             .eq('item_id', formData.barcode)
+            .eq('registered_by', user.id)  // 自分が登録したものだけをチェック
             .eq('item_deleted', false)
             .single();
 
             if (existingItem) {
             setNotification({
                 show: true,
-                message: '既にデータが登録されています',
+                message: 'あなたは既にこの物品IDを登録しています',
                 type: 'error'
             });
             return false;
+            }
+            
+            // アクティブな（削除されていない）同じitem_idがあるか全体で確認
+            const { data: existingActiveItem } = await supabase
+            .from('items')
+            .select('item_id')
+            .eq('item_id', formData.barcode)
+            .eq('item_deleted', false)
+            .single();
+            
+            if (existingActiveItem) {
+            // 警告を表示するが、必要に応じて登録を続行できるようにする
+            if (!confirm('この物品IDは他のユーザーによって既に登録されています。それでも登録しますか？')) {
+                return false;
+            }
             }
         }
 

@@ -99,16 +99,25 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData, setCsvData, user
             errors.push('管理者は必須です');
           }
 
-          // Check if item_id already exists
+          // 重複チェック部分を修正
+          const { data: { user } } = await supabase.auth.getUser();
+
+          if (!user || !user.id) {
+            errors.push('ユーザー情報が取得できません');
+            return { ...item, isValid: false, errors };
+          }
+
+          // 自分が登録した同じitem_idのアイテムがないか確認
           const { data: existingItem } = await supabase
             .from('items')
             .select('item_id')
             .eq('item_id', item.item_id)
+            .eq('registered_by', user.id)  // 自分が登録したものだけをチェック
             .eq('item_deleted', false)
             .single();
 
           if (existingItem) {
-            errors.push('この物品IDは既に登録されています');
+            errors.push('あなたは既にこの物品IDを登録しています');
           }
 
           return {

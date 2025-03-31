@@ -477,3 +477,46 @@ export const insertWithUuidOwner = async (
     throw error;
   }
 };
+
+// itemsテーブルの制約を更新する関数
+export const updateItemsTableConstraints = async () => {
+  try {
+    // Supabaseで実行するSQL
+    const { error } = await supabase.rpc('update_items_constraints');
+    
+    if (error) {
+      console.error('制約の更新時にエラーが発生しました:', error);
+      
+      // RPC関数が存在しない場合のSQLを提案
+      const createRpcSQL = `
+        -- この関数はitemsテーブルの制約を更新します
+        CREATE OR REPLACE FUNCTION update_items_constraints()
+        RETURNS void AS $$
+        BEGIN
+          -- まず既存のユニーク制約を削除（存在する場合）
+          ALTER TABLE items DROP CONSTRAINT IF EXISTS items_item_id_key;
+          
+          -- registered_byとitem_idの組み合わせでユニーク制約を作成
+          ALTER TABLE items ADD CONSTRAINT items_registered_by_item_id_key 
+            UNIQUE (registered_by, item_id);
+          
+          -- item_deletedがfalseの場合のみ適用されるユニーク制約を追加
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_items_active_id 
+            ON items (item_id) 
+            WHERE item_deleted = false;
+        END;
+        $$ LANGUAGE plpgsql SECURITY DEFINER;
+      `;
+      
+      console.log('制約更新用のRPC関数を作成する必要があります:', createRpcSQL);
+      alert('データベーステーブルの制約を更新する必要があります。管理者に連絡してください。');
+      
+      return { success: false, error: 'RPC function not available' };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('制約の更新中にエラーが発生しました:', error);
+    return { success: false, error };
+  }
+};

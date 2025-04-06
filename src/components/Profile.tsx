@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 
 // 明示的にローカルストレージをクリアする関数
 export const clearAuthCache = () => {
@@ -17,7 +17,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -100,7 +100,7 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
       };
       
       // Supabase Authのユーザーメタデータを更新
-      const { data, error } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         data: metadata
       });
       

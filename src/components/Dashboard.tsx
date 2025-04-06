@@ -144,7 +144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
     
     // 認証状態の変更を監視するリスナー
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (session) => {
         setIsAuthenticated(!!session);
         
         if (session) {

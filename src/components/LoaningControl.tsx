@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'; // useCallback を追加
-import { supabase, formatJSTDateTime, insertWithOwnerId, getCurrentUserId } from '../lib/supabase'; // getCurrentUserId をインポート
+import { supabase, insertWithOwnerId } from '../lib/supabase'; // getCurrentUserId をインポート
 import { AlertCircle, X, Barcode, StopCircle } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 
@@ -389,7 +389,7 @@ export default function LoaningControl() {
               item_id: oldItemId,         // 古いitem_id (varchar)
               event_id: oldEventId,       // 古いevent_id (varchar)
               item_id_ref: itemIdRef,     // 新しいitem.id (int8)
-              event_id_ref: eventIdRef,   // 新しいevent.id (int8)
+              event_id_ref: eventIdRef || selectedEventRefId,   // 新しいevent.id (int8)を使用、なければ選択中のイベントIDを使用
               start_datetime: loanTime,
               end_datetime: returnTime
             }

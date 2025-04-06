@@ -92,7 +92,7 @@ export default function EventRegist() {
       }
 
       // 重複がなければ新規登録
-      const { data, error } = await insertWithOwnerId(
+      const { error } = await insertWithOwnerId(
         'events',
         {
           event_id: eventData.eventId,  // event_idカラム

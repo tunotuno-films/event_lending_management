@@ -1,6 +1,6 @@
     import React, { useState, useEffect } from 'react';
     import { useNavigate } from 'react-router-dom';
-    import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase';
+    import { supabase, insertWithOwnerId } from '../lib/supabase';
     import { Barcode, StopCircle, X, AlertTriangle } from 'lucide-react';
     import Notification from './Notification';
     import { useZxing } from 'react-zxing';
@@ -25,7 +25,6 @@
     }
 
     const RegisterItem: React.FC<RegisterItemProps> = ({
-    userEmail,
     isAuthenticated = false,
     setAuthModalMode,
     setIsAuthModalOpen,

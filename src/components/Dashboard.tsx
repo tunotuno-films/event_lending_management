@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase, getCurrentUserId, formatJSTDateTime } from '../lib/supabase';
+import { supabase ,getCurrentUserId , formatJSTDateTime } from '../lib/supabase';
 import { 
   Barcode, 
   LayoutList, 
@@ -39,21 +39,7 @@ interface UserProfile {
 }
 
 // Supabaseのデータ型定義
-interface ResultItem {
-  result_id: number;
-  start_datetime: string;
-  end_datetime: string | null;
-  item_id: string;
-  event_id: string;
-  item_id_ref?: number;
-  event_id_ref?: number;
-  items?: {
-    name: string;
-  } | null;
-  events?: {
-    name: string;
-  } | null;
-}
+// Removed unused interface 'ResultItem'
 
 // mostBorrowed の型定義を追加
 interface MostBorrowedItem {
@@ -144,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
     
     // 認証状態の変更を監視するリスナー
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (session) => {
+      async (_event, session) => {
         setIsAuthenticated(!!session);
         
         if (session) {
@@ -189,6 +175,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
       )
       .subscribe();
 
+    // 定期的に更新するタイマーを追加（オプション）
+    const refreshInterval = setInterval(() => {
+      if (isAuthenticated) {
+        fetchDashboardData();
+      }
+    }, 60000); // 1分ごとに更新
+
     // クリーンアップ関数でリスナーとサブスクリプションを解除
     return () => {
       if (authListener && authListener.subscription) {
@@ -197,17 +190,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
       
       controlSubscription.unsubscribe();
       resultSubscription.unsubscribe();
+      clearInterval(refreshInterval);
     };
-  }, []); // 初回マウント時のみ実行
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      const refreshInterval = setInterval(() => {
-        fetchDashboardData();
-      }, 60000); // 1分ごとに更新
-      return () => clearInterval(refreshInterval);
-    }
-  }, [isAuthenticated]);
+  }, [isAuthenticated]); // isAuthenticatedが変わったときだけ再実行
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -227,6 +212,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         setLoading(false);
         return;
       }
+      
+      // タイムスタンプパラメータを追加してキャッシュを防ぐ
+      // const timestamp = new Date().getTime();
       
       // アイテム総数を取得
       const { count: itemsCount } = await supabase
@@ -272,8 +260,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           items:item_id_ref(name),
           events:event_id_ref(name)
         `)
-        .order('start_datetime', { ascending: true }) // 昇順で取得
-        .limit(10) as { data: ResultItem[] | null, error: any };
+        .order('start_datetime', { ascending: false })
+        .limit(10);
 
       if (mostBorrowedError) {
         console.error('Error fetching most borrowed items:', mostBorrowedError);
@@ -804,15 +792,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                             <div className="flex flex-col items-center">
                               <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
                               <p>ログインするとデータが表示されます</p>
-                              <button
-                                onClick={() => {
-                                  if (setAuthMode) setAuthMode('signin');
-                                  if (setShowAuthModal) setShowAuthModal(true);
-                                }}
-                                className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-                              >
-                                ログイン
-                              </button>
                             </div>
                           </>
                         )}
@@ -875,7 +854,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                                 </div>
                               </div>
                             </li>
-                          )).reverse()} {/* 下から貸出→返却の順番になるよう反転表示 */}
+                          ))}
                         </ul>
                       ) : (
                         <div className="flex items-center justify-center h-60 py-12 text-center text-gray-500">
@@ -907,15 +886,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                       <div className="flex flex-col items-center">
                         <Lock className="h-12 w-12 mx-auto text-gray-300 mb-2" />
                         <p>ログインするとデータが表示されます</p>
-                        <button
-                          onClick={() => {
-                            if (setAuthMode) setAuthMode('signin');
-                            if (setShowAuthModal) setShowAuthModal(true);
-                          }}
-                          className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-                        >
-                          ログイン
-                        </button>
                       </div>
                     </div>
                   </div>

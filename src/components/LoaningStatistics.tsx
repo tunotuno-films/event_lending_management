@@ -274,7 +274,7 @@ export default function LoaningStatistics() {
             <option value="">イベントを選択してください</option>
             {events.map(event => (
               <option key={event.event_id} value={event.event_id}>
-                {event.name}
+                {event.event_id} - {event.name}
               </option>
             ))}
           </select>

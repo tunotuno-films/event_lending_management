@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
 
@@ -327,6 +327,37 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
+  // 初期値を item_id の昇順に設定
+  const [sortColumn, setSortColumn] = useState<string>('item_id');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // ソート状態に基づいてitemsを整列
+  const sortedItems = useMemo(() => {
+    if (!sortColumn) return items;
+    return items.slice().sort((a, b) => {
+      let aVal = a[sortColumn as keyof Item];
+      let bVal = b[sortColumn as keyof Item];
+      if (sortColumn === 'registered_date') {
+        const aDate = new Date(aVal as string);
+        const bDate = new Date(bVal as string);
+        if (aDate < bDate) return sortDirection === 'asc' ? -1 : 1;
+        if (aDate > bDate) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      }
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortColumn, sortDirection]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   useEffect(() => {
     fetchItems();
@@ -482,92 +513,113 @@ export default function ItemList() {
         </div>
       </div>
   
-      <div className="w-full overflow-hidden border border-gray-200 rounded-lg">
-        <div className="w-full min-w-[800px]">
-          <table className="w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  画像
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  物品ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  物品名
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ジャンル
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  管理者
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  登録日
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  操作
-                </th>
+      <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
+        <table className="w-full min-w-[800px] divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr className="align-middle">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                画像
+              </th>
+              <th
+                onClick={() => handleSort('item_id')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='item_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                物品ID {sortColumn==='item_id' && (
+                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                )}
+              </th>
+              <th
+                onClick={() => handleSort('name')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                物品名 {sortColumn==='name' && (
+                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                )}
+              </th>
+              <th
+                onClick={() => handleSort('genre')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='genre' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                ジャンル {sortColumn==='genre' && (
+                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                )}
+              </th>
+              <th
+                onClick={() => handleSort('manager')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='manager' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                管理者 {sortColumn==='manager' && (
+                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                )}
+              </th>
+              <th
+                onClick={() => handleSort('registered_date')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='registered_date' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                登録日 {sortColumn==='registered_date' && (
+                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                )}
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                編集
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                削除
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {sortedItems.map((item) => (
+              <tr key={item.item_id} className="hover:bg-gray-50 align-middle">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                    <img
+                      src={getItemImageUrl(item.image)}
+                      alt={item.name}
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                    />
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{item.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                    {item.genre}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                    {item.manager}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(item.registered_date)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setEditingItem(item)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setDeletingItem(item)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </td>
               </tr>
-            </thead>
-          </table>
-        </div>
-        
-        <div className="overflow-x-auto w-full max-h-[70vh]">
-          <table className="w-full min-w-[800px] divide-y divide-gray-200">
-            <tbody className="bg-white divide-y divide-gray-200">
-              {items.map((item) => (
-                <tr key={item.item_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                      <img
-                        src={getItemImageUrl(item.image)}
-                        alt={item.name}
-                        className="max-h-full max-w-full object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{item.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {item.genre}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                      {item.manager}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(item.registered_date)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-4">
-                      <button
-                        onClick={() => setEditingItem(item)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => setDeletingItem(item)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
   
       {/* モーダル部分 */}

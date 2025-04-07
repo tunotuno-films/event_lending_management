@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
 
@@ -21,7 +21,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    // タイマーを設定して、カウントダウンを行う
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -33,9 +32,8 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
       });
     }, 1000);
 
-    // クリーンアップ関数でタイマーをクリア
     return () => clearInterval(timer);
-  }, [onClose]); // onCloseが変更されたときだけ再実行
+  }, [onClose]);
 
   const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
   const hoverColor = type === 'success' ? 'hover:bg-green-600' : 'hover:bg-red-600';
@@ -189,6 +187,35 @@ export default function EventsList() {
     message: '',
     type: 'success'
   });
+  const [sortColumn, setSortColumn] = useState<string>('event_id');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const sortedEvents = useMemo(() => {
+    if (!sortColumn) return events;
+    return events.slice().sort((a, b) => {
+      let aVal = a[sortColumn as keyof Event];
+      let bVal = b[sortColumn as keyof Event];
+      if (sortColumn === 'created_at') {
+        const aDate = new Date(aVal as string);
+        const bDate = new Date(bVal as string);
+        if (aDate < bDate) return sortDirection === 'asc' ? -1 : 1;
+        if (aDate > bDate) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      }
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [events, sortColumn, sortDirection]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -198,7 +225,6 @@ export default function EventsList() {
     try {
       setLoading(true);
       
-      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -344,22 +370,34 @@ export default function EventsList() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                イベントID
+              <th
+                onClick={() => handleSort('event_id')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='event_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                イベントID {sortColumn==='event_id' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                イベント名
+              <th
+                onClick={() => handleSort('name')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                イベント名 {sortColumn==='name' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                作成日時
+              <th
+                onClick={() => handleSort('created_at')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='created_at' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+              >
+                作成日時 {sortColumn==='created_at' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                操作
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                編集
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                削除
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {events.map((event) => (
+            {sortedEvents.map((event) => (
               <tr key={event.event_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
@@ -370,21 +408,21 @@ export default function EventsList() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatDate(event.created_at)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end gap-4">
-                    <button
-                      onClick={() => setEditingEvent(event)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => setDeletingEvent(event)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setEditingEvent(event)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setDeletingEvent(event)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </td>
               </tr>
             ))}

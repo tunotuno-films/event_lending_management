@@ -17,6 +17,7 @@ import {
   ArrowUpRight, // 貸出用の新しいアイコン
   ArrowDownRight, // 返却用の新しいアイコン
   Lock, // ログインが必要な場合のアイコン
+  Edit // 編集アイコン
 } from 'lucide-react';
 
 // stats型定義の修正
@@ -460,8 +461,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
                 <p className="font-medium text-gray-800">{userProfile.name}</p>
                 <p className="text-xs text-gray-500">{userProfile.email}</p>
               </div>
-              <Link to="/profile" className="ml-4 text-blue-600 hover:text-blue-800 text-sm">
-                編集
+              <Link to="/profile" className="ml-4 text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1">
+                編集 <Edit className="h-4 w-4" />
               </Link>
             </div>
           )}

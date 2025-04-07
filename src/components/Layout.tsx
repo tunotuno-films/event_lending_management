@@ -166,8 +166,8 @@ export default function Layout({
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* ヘッダー */}
-      <div className="bg-white shadow-sm w-full">
+      {/* ヘッダー：fixedに変更 */}
+      <div className="fixed top-0 z-50 bg-white shadow-sm w-full">
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             <button 
@@ -249,25 +249,13 @@ export default function Layout({
           </div>
         </div>
       </div>
-
-      <div className="flex flex-1">
-        {/* サイドバー - 共通化 */}
-        <div className={`
-          bg-white shadow-sm fixed inset-y-0 left-0 z-30 w-64 transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:relative md:translate-x-0
-        `}>
-          {/* スマホ用閉じるボタン */}
-          <div className="px-4 py-3 flex justify-between items-center border-b md:hidden">
-            <h1 className="text-xl font-semibold text-gray-800">メニュー</h1>
-            <button 
-              onClick={() => setIsSidebarOpen(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X size={24} />
-            </button>
-          </div>
-          
+      {/* ヘッダー高さ分のプレースホルダー */}
+      <div className="h-[5rem]"></div>
+      
+      {/* main container：サイドバーは固定、メインコンテンツのみスクロール */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar：fixedで左に固定 */}
+        <div className="hidden md:block fixed top-0 left-0 h-screen w-64 bg-white shadow-sm z-30">
           {/* サイドバーコンテンツ - ログイン状態に関わらず全て表示 */}
           <div className="py-4">
             {/* メニュー - ホームだけを残す */}
@@ -487,20 +475,257 @@ export default function Layout({
             </div>
           </div>
         </div>
-        
-        {/* オーバーレイバックドロップ - スマホでサイドバーが開いた時 */}
-        {isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          ></div>
-        )}
-        
-        {/* メインコンテンツ */}
-        <div className="flex-1 p-4 md:p-6 overflow-x-hidden">
+
+        {/* Mobile Sidebar */}
+        <div className="md:hidden">
+          <div className={`
+            bg-white shadow-sm fixed inset-y-0 left-0 z-30 w-64 transform transition-transform duration-300 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          `}>
+            {/* スマホ用閉じるボタン */}
+            <div className="px-4 py-3 flex justify-between items-center border-b">
+              <h1 className="text-xl font-semibold text-gray-800">メニュー</h1>
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            {/* サイドバーコンテンツ - ログイン状態に関わらず全て表示 */}
+            <div className="py-4">
+              {/* メニュー - ホームだけを残す */}
+              <div className="px-4 mb-6">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  メニュー
+                </div>
+                <nav className="space-y-1">
+                  <Link 
+                    to="/"
+                    className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    <Home className="mr-3" size={20} />
+                    <span>ホーム</span>
+                  </Link>
+                </nav>
+              </div>
+              
+              {/* 物品管理メニュー */}
+              <div className="px-4 mb-6">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  物品管理
+                </div>
+                <nav className="space-y-1">
+                  <Link 
+                    to="/item/regist"
+                    className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/regist' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    <Package className="mr-3" size={20} />
+                    <span>物品登録</span>
+                  </Link>
+
+                  {isAuthenticated ? (
+                    <Link 
+                      to="/item/list"
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/item/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <LayoutList className="mr-3" size={20} />
+                      <span>物品一覧</span>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={handleAuthRequired}
+                      className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                    >
+                      <LayoutList className="mr-3" size={20} />
+                      <span>物品一覧</span>
+                    </button>
+                  )}
+                </nav>
+              </div>
+              
+              {/* イベントメニュー */}
+              <div className="px-4 mb-6">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  イベント
+                </div>
+                <nav className="space-y-1">
+                  {isAuthenticated ? (
+                    <>
+                      <Link 
+                        to="/event/regist"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/regist' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <Calendar className="mr-3" size={20} />
+                        <span>イベント登録</span>
+                      </Link>
+                      <Link 
+                        to="/event/list"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/list' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <LayoutList className="mr-3" size={20} />
+                        <span>イベント一覧</span>
+                      </Link>
+                      <Link 
+                        to="/event/daily"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/event/daily' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <Shuffle className="mr-3" size={20} />
+                        <span>当日物品登録</span>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <Calendar className="mr-3" size={20} />
+                        <span>イベント登録</span>
+                      </button>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <LayoutList className="mr-3" size={20} />
+                        <span>イベント一覧</span>
+                      </button>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <Shuffle className="mr-3" size={20} />
+                        <span>当日物品登録</span>
+                      </button>
+                    </>
+                  )}
+                </nav>
+              </div>
+              
+              {/* 貸出管理メニュー */}
+              <div className="px-4 mb-6">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  貸出管理
+                </div>
+                <nav className="space-y-1">
+                  {isAuthenticated ? (
+                    <>
+                      <Link 
+                        to="/loaning/control"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/control' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <Barcode className="mr-3" size={20} />
+                        <span>貸出管理</span>
+                      </Link>
+                      <Link 
+                        to="/loaning/log"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/log' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <History className="mr-3" size={20} />
+                        <span>貸出履歴</span>
+                      </Link>
+                      <Link 
+                        to="/loaning/statistics"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/loaning/statistics' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <BarChart className="mr-3" size={20} />
+                        <span>貸出統計</span>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <Barcode className="mr-3" size={20} />
+                        <span>貸出管理</span>
+                      </button>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <History className="mr-3" size={20} />
+                        <span>貸出履歴</span>
+                      </button>
+                      <button
+                        onClick={handleAuthRequired}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 opacity-75"
+                      >
+                        <BarChart className="mr-3" size={20} />
+                        <span>貸出統計</span>
+                      </button>
+                    </>
+                  )}
+                </nav>
+              </div>
+              
+              {/* アカウントメニュー */}
+              <div className="px-4">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  アカウント
+                </div>
+                <nav className="space-y-1">
+                  {isAuthenticated ? (
+                    <>
+                      <Link 
+                        to="/profile"
+                        className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/Profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <User className="mr-3" size={20} />
+                        <span>プロフィール</span>
+                      </Link>
+                      <button 
+                        onClick={() => setShowLogoutModal(true)}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                      >
+                        <LogOut className="mr-3" size={20} />
+                        <span>ログアウト</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => {
+                          setAuthMode('signin');
+                          setShowAuthModal(true);
+                        }}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                      >
+                        <LogIn className="mr-3" size={20} />
+                        <span>ログイン</span>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setAuthMode('signup');
+                          setShowAuthModal(true);
+                        }}
+                        className="w-full flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+                      >
+                        <UserPlus className="mr-3" size={20} />
+                        <span>会員登録</span>
+                      </button>
+                    </>
+                  )}
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content：デスクトップ時には左余白を設ける */}
+        <div className="flex-1 overflow-y-auto ml-0 md:ml-64">
           {children}
         </div>
       </div>
+
+      {/* オーバーレイバックドロップ - スマホでサイドバーが開いた時 */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
 
       {/* ログアウト確認モーダル */}
       {showLogoutModal && (

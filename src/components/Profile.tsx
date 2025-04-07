@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-// import { useNavigate } from 'react-router-dom';
 
 // 明示的にローカルストレージをクリアする関数
 export const clearAuthCache = () => {
@@ -17,10 +16,10 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
-  // const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
     show: false,
     message: '',
@@ -33,22 +32,16 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
 
   const fetchUserProfile = async () => {
     if (!userEmail) return;
-    
     try {
       setLoading(true);
-      
-      // ユーザー情報を取得
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        throw userError;
-      }
-      
+      if (userError) throw userError;
       if (user) {
-        // ユーザーのメタデータから情報を取得
         const userMetadata = user.user_metadata || {};
         setName(userMetadata.name || '');
         setPhoneNumber(userMetadata.phone_number || '');
+        const url = userMetadata.avatar_url || userMetadata.picture;
+        setAvatarUrl(url || null);
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error);
@@ -57,17 +50,13 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
     }
   };
 
-  // 電話番号の入力ハンドラ（数字とハイフンのみ許可）
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // 数字とハイフンのみを許可
     const filteredValue = value.replace(/[^\d-]/g, '');
     setPhoneNumber(filteredValue);
   };
 
-  // 入力値のバリデーション
   const validateInput = () => {
-    // 電話番号が空でない場合、最低7桁（市内局番+加入者番号）あるか確認
     const digitCount = phoneNumber.replace(/-/g, '').length;
     if (phoneNumber && digitCount < 7) {
       setNotification({
@@ -82,53 +71,33 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
 
   const updateUserProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!userEmail) return;
-    
-    // 入力値の検証
-    if (!validateInput()) {
-      return;
-    }
-    
+    if (!validateInput()) return;
     try {
       setLoading(true);
-      
-      // 更新するメタデータを準備
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('ユーザーが見つかりません');
       const metadata = {
         name,
         phone_number: phoneNumber
       };
-      
-      // Supabase Authのユーザーメタデータを更新
-      const { error } = await supabase.auth.updateUser({
-        data: metadata
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
+      const { error } = await supabase.auth.updateUser({ data: metadata });
+      if (error) throw error;
       setNotification({
         show: true,
         message: 'プロフィールが更新されました',
         type: 'success'
       });
-      
-      // 3秒後に通知を非表示
       setTimeout(() => {
         setNotification(prev => ({ ...prev, show: false }));
       }, 3000);
-      
     } catch (error: any) {
       console.error('Error updating user profile:', error);
-      
       setNotification({
         show: true,
         message: `プロフィールの更新に失敗しました: ${error?.message || '不明なエラー'}`,
         type: 'error'
       });
-      
-      // 5秒後に通知を非表示
       setTimeout(() => {
         setNotification(prev => ({ ...prev, show: false }));
       }, 5000);
@@ -140,6 +109,17 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
   return (
     <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-6">プロフィール設定</h1>
+      
+      {/* プロフィール画像の表示 */}
+      {avatarUrl && (
+        <div className="flex justify-start mb-4">
+          <img 
+            src={avatarUrl} 
+            alt="Profile" 
+            className="w-24 h-24 rounded-full object-cover" 
+          />
+        </div>
+      )}
       
       {notification.show && (
         <div className={`mb-4 p-4 rounded-lg ${notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

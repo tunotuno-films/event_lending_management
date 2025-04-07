@@ -28,7 +28,7 @@ interface DashboardStats {
   totalUsers: number;
   pendingReturns: number;
   mostBorrowedItems: Array<{id: string, name: string, image: string | null, count: number}>;
-  recentActivity: Array<{id: number, action: string, item: string, time: string, user: string}>;
+  recentActivity: Array<{id: string, action: string, item: string, time: string, user: string}>;
 }
 
 // ユーザー情報の型定義を追加
@@ -314,47 +314,72 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
           .slice(0, 5);
       }
       
-      let recentActivity: Array<{id: number, action: string, item: string, time: string, user: string}> = [];
+      let recentActivity: Array<{id: string, action: string, item: string, time: string, user: string}> = [];
       if (recentResults && recentResults.length > 0) {
-        recentActivity = recentResults.map(result => {
-          const actionType = result.end_datetime ? '返却' : '貸出';
-          
-          // リレーショナルデータの正しい構造を反映
-          let itemName = '不明な物品';
-          if (result.items) {
-            // 配列の場合
-            if (Array.isArray(result.items) && result.items.length > 0 && result.items[0]?.name) {
-              itemName = result.items[0].name;
-            } 
-            // リレーショナル形式の場合
-            else if (typeof result.items === 'object' && 'name' in result.items && typeof result.items.name === 'string') {
-              itemName = result.items.name;
+        // activities に rawTime を付与して flatMap
+        let activities = recentResults.flatMap(result => {
+            const events = [];
+            let itemName = '不明な物品';
+            if (result.items) {
+              if (Array.isArray(result.items) && result.items.length > 0 && result.items[0]?.name) {
+                itemName = result.items[0].name;
+              } else if (typeof result.items === 'object' && 'name' in result.items && typeof result.items.name === 'string') {
+                itemName = result.items.name;
+              }
             }
-          }
-          
-          let eventName = '不明なイベント';
-          if (result.events) {
-            if (Array.isArray(result.events) && result.events.length > 0 && result.events[0]?.name) {
-              eventName = result.events[0].name;
-            } else if (typeof result.events === 'object' && 'name' in result.events && typeof result.events.name === 'string') {
-              eventName = result.events.name;
+            let eventName = '不明なイベント';
+            if (result.events) {
+              if (Array.isArray(result.events) && result.events.length > 0 && result.events[0]?.name) {
+                eventName = result.events[0].name;
+              } else if (typeof result.events === 'object' && 'name' in result.events && typeof result.events.name === 'string') {
+                eventName = result.events.name;
+              }
             }
-          }
-            
-          return {
-            id: result.result_id,
-            action: actionType,
-            item: itemName,
-            time: formatJSTDateTime(actionType === '貸出' ? result.start_datetime : result.end_datetime),
-            user: eventName
-          };
+            if (result.start_datetime) {
+              events.push({
+                id: result.result_id + '_start',
+                action: '貸出',
+                item: itemName,
+                time: formatJSTDateTime(result.start_datetime),
+                user: eventName,
+                rawTime: new Date(result.start_datetime).getTime()
+              });
+            }
+            if (result.end_datetime) {
+              events.push({
+                id: result.result_id + '_end',
+                action: '返却',
+                item: itemName,
+                time: formatJSTDateTime(result.end_datetime),
+                user: eventName,
+                rawTime: new Date(result.end_datetime).getTime()
+              });
+            }
+            return events;
         });
+        // ソート: rawTime の降順、同一の場合は "返却" を優先
+        activities.sort((a, b) => {
+          if (b.rawTime === a.rawTime) {
+            if (a.action === b.action) return 0;
+            return a.action === '返却' ? -1 : 1;
+          }
+          return b.rawTime - a.rawTime;
+        });
+        // rawTime を除去して recentActivity にセット
+        recentActivity = activities.slice(0, 5).map(({ rawTime, ...rest }) => rest);
       }
       
-      // プロファイル数を取得
-      const { count: totalUsers = 0 } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // プロファイル数を取得（profilesテーブルが存在しない場合は0とする）
+      let totalUsers = 0;
+      const { count, error: profileError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+      if (profileError) {
+          console.error('profiles テーブルが存在しません。totalUsers を 0 に設定します。', profileError);
+          totalUsers = 0;
+      } else {
+          totalUsers = count || 0;
+      }
       
       // 返却待ちアイテム数
       const pendingReturns = activeLoansCount || 0;
@@ -364,7 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setShowAuthModal, setAuthMode }) 
         eventsCount: eventsCount || 0,
         activeLoansCount: activeLoansCount || 0,
         completedLoansCount: completedLoansCount || 0,
-        totalUsers: totalUsers || 0,
+        totalUsers: totalUsers,
         pendingReturns: pendingReturns,
         mostBorrowedItems,
         recentActivity

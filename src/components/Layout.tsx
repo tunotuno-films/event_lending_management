@@ -186,18 +186,15 @@ export default function Layout({
           {/* ユーザー情報 */}
           <div className="flex items-center">
             {isAuthenticated ? (
+              // ユーザー情報クリックでログアウトモーダルを表示
               <div 
-                className="relative flex items-center space-x-2 cursor-pointer group"
                 onClick={() => setShowLogoutModal(true)}
+                className="relative flex items-center space-x-2 cursor-pointer group"
               >
                 <span className="font-medium truncate max-w-[120px] group-hover:text-blue-600 transition-colors">
                   {userName || userEmail?.split('@')[0] || 'ゲスト'}
                 </span>
                 <UserIcon userProfileImage={userProfileImage} userEmail={userEmail} />
-                {/* ホバー時に表示するドロップダウンヒント */}
-                <span className="absolute hidden group-hover:block right-0 top-full mt-1 bg-white px-2 py-1 text-xs text-gray-600 rounded shadow-md whitespace-nowrap">
-                  ログアウト
-                </span>
               </div>
             ) : (
               <div className="flex gap-2">
@@ -449,7 +446,7 @@ export default function Layout({
                   <>
                     <Link 
                       to="/profile"
-                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                      className={`flex items-center px-3 py-2 rounded-md ${location.pathname === '/Profile' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <User className="mr-3" size={20} />
                       <span>プロフィール</span>

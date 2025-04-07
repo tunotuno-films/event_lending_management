@@ -285,7 +285,7 @@
         const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
 
         // 新しい関数を使用して登録
-        const { data: insertedItem, error: insertError } = await insertWithOwnerId(
+        const { error: insertError } = await insertWithOwnerId(
             'items',
             {
             item_id: formData.barcode || null,
@@ -656,6 +656,7 @@
                 
                 {/* バルクアップロードボタン（認証済みユーザーのみ表示） */}
                 {isAuthenticated && (
+                <>
                 <button
                     type="button"
                     onClick={() => setShowBulkUploadModal(true)}
@@ -663,6 +664,14 @@
                 >
                     <span>一括登録</span>
                 </button>
+                <button
+                    type="button"
+                    onClick={downloadCsvTemplate}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                >
+                    <span>CSVテンプレートをダウンロード</span>
+                </button>
+                </>
                 )}
             </div>
             </form> 

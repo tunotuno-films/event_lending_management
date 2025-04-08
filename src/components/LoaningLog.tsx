@@ -285,10 +285,23 @@ export default function LoaningLog() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `loan_history_${selectedEventId}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    // ファイル名を「yyyymmdd_貸出履歴_イベントid-イベント名.csv」形式に変更
+    const today = new Date();
+    const yyyy = today.getFullYear().toString();
+    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+    const dd = today.getDate().toString().padStart(2, '0');
+    const dateString = `${yyyy}${mm}${dd}`;
+    const selectedEvent = events.find(e => e.event_id === selectedEventId);
+    const fileName = selectedEvent 
+      ? `${dateString}_貸出履歴_${selectedEvent.event_id}-${selectedEvent.name}.csv`
+      : `${dateString}_貸出履歴.csv`;
+    link.download = fileName;
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   };
 
   return (
@@ -326,7 +339,7 @@ export default function LoaningLog() {
       {selectedEventId && (
         <>
           <div className="flex justify-between items-center mb-4">
-            <div className="flex gap-2">
+            <div>
               <button
                 onClick={handleDeleteShortLoans}
                 className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center gap-2"
@@ -334,6 +347,8 @@ export default function LoaningLog() {
                 <X size={16} />
                 60秒未満の貸出を削除
               </button>
+            </div>
+            <div>
               <button
                 onClick={downloadCSV}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-2"

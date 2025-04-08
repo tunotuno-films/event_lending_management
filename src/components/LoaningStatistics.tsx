@@ -228,10 +228,23 @@ export default function LoaningStatistics() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `loan_statistics_${selectedEventId}_${new Date().toISOString()}.csv`;
+
+    // ファイル名を「yyyymmdd_貸出統計_イベントid-イベント名.csv」形式に変更
+    const today = new Date();
+    const yyyy = today.getFullYear().toString();
+    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+    const dd = today.getDate().toString().padStart(2, '0');
+    const dateString = `${yyyy}${mm}${dd}`;
+    const selectedEvent = events.find(e => e.event_id === selectedEventId);
+    const fileName = selectedEvent 
+      ? `${dateString}_貸出統計_${selectedEvent.event_id}-${selectedEvent.name}.csv`
+      : `${dateString}_貸出統計.csv`;
+    link.download = fileName;
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   };
 
   const getHeatmapColor = (count: number, maxCount: number) => {

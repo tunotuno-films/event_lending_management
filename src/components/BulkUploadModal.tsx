@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Upload } from 'lucide-react';
 
 interface BulkUploadModalProps {
   onClose: () => void;
@@ -31,6 +31,12 @@ export default function BulkUploadModal({ onClose, onUpload }: BulkUploadModalPr
     }
   };
 
+  const handleUpload = () => {
+    if (selectedFile) {
+      onUpload(selectedFile);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
@@ -55,24 +61,22 @@ export default function BulkUploadModal({ onClose, onUpload }: BulkUploadModalPr
             />
           </div>
 
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+          <div className="flex justify-end gap-4">
+            <button  
+              type="button" 
+              onClick={onClose} 
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center"
             >
-              キャンセル
+              <X size={16} className="mr-2" />
+              <span>キャンセル</span>
             </button>
-            <button
-              type="submit"
-              disabled={!selectedFile}
-              className={`px-4 py-2 rounded-md ${
-                selectedFile
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+            <button  
+              type="button" 
+              onClick={handleUpload} 
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center"
             >
-              アップロード
+              <Upload size={16} className="mr-2" />
+              <span>アップロード</span>
             </button>
           </div>
         </form>

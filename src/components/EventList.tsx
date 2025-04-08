@@ -121,7 +121,7 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-1/2">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">イベント編集</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -189,6 +189,7 @@ export default function EventsList() {
   });
   const [sortColumn, setSortColumn] = useState<string>('event_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const sortedEvents = useMemo(() => {
     if (!sortColumn) return events;
@@ -248,6 +249,32 @@ export default function EventsList() {
       setLoading(false);
     }
   };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim() === '') {
+      fetchEvents();
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .or(`event_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
+          .eq('event_deleted', false)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setEvents(data || []);
+      } catch (error) {
+        console.error('Error searching events:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      handleSearch();
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const handleUpdateEvent = async (updatedEvent: Event) => {
     try {
@@ -364,6 +391,16 @@ export default function EventsList() {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">イベント一覧</h2>
+      </div>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="イベントIDまたはイベント名で検索"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2"
+        />
       </div>
 
       <div className="overflow-x-auto">

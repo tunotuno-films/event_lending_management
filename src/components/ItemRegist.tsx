@@ -1,7 +1,7 @@
     import React, { useState, useEffect } from 'react';
     import { useNavigate } from 'react-router-dom';
     import { supabase, insertWithOwnerId } from '../lib/supabase';
-    import { Barcode, StopCircle, X, AlertTriangle } from 'lucide-react';
+    import { Barcode, StopCircle, X, AlertTriangle, Download, Upload, CheckCircle } from 'lucide-react';
     import Notification from './Notification';
     import { useZxing } from 'react-zxing';
     import BulkUploadModal from './BulkUploadModal';
@@ -630,13 +630,14 @@
                 )}
             </div>
 
-            {/* フォーム送信ボタン部分を条件分岐で修正 */}
+            {/* フォーム送信ボタン部分 */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center">
                 {isAuthenticated ? (
                 <button
                     type="submit"
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
                 >
+                    <CheckCircle size={20} className="mr-2" />
                     <span>登録する</span>
                 </button>
                 ) : (
@@ -648,8 +649,9 @@
                         setIsAuthModalOpen(true);
                     }
                     }}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
                 >
+                    <AlertTriangle size={20} className="mr-2" />
                     <span>登録するにはログインが必要です</span>
                 </button>
                 )}
@@ -660,16 +662,18 @@
                 <button
                     type="button"
                     onClick={() => setShowBulkUploadModal(true)}
-                    className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                    className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
                 >
-                    <span>一括登録</span>
+                    <Upload size={20} className="mr-2" />
+                    <span>CSVから一括登録</span>
                 </button>
                 <button
                     type="button"
                     onClick={downloadCsvTemplate}
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md flex items-center justify-center"
+                    className="w-full sm:w-auto ml-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
                 >
-                    <span>CSVテンプレートをダウンロード</span>
+                    <Download size={20} className="mr-2" />
+                    <span>CSVテンプレート</span>
                 </button>
                 </>
                 )}

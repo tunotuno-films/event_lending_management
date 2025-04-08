@@ -330,6 +330,8 @@ export default function ItemList() {
   // 初期値を item_id の昇順に設定
   const [sortColumn, setSortColumn] = useState<string>('item_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // 新規: 検索用の状態を追加
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // ソート状態に基づいてitemsを整列
   const sortedItems = useMemo(() => {
@@ -387,6 +389,34 @@ export default function ItemList() {
       setLoading(false);
     }
   };
+
+  // 新規: 非同期で検索する関数
+  const handleSearch = async () => {
+    if (searchQuery.trim() === '') {
+      fetchItems();
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('*')
+          .or(`item_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
+          .eq('item_deleted', false)
+          .order('registered_date', { ascending: false });
+        if (error) throw error;
+        setItems(data || []);
+      } catch (error) {
+        console.error('Error searching items:', error);
+      }
+    }
+  };
+
+  // 新規: 検索入力の変化を監視して非同期で検索
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      handleSearch();
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const handleUpdateItem = async (updatedItem: Item) => {
     try {
@@ -548,6 +578,17 @@ export default function ItemList() {
             CSVダウンロード
             </button>
         </div>
+      </div>
+  
+      {/* 新規: タイトル直後、表の上に検索入力欄を配置 */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="物品IDまたは物品名で検索"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2"
+        />
       </div>
   
       <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">

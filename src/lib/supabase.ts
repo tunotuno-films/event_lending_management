@@ -69,15 +69,20 @@ export const createSupportTable = async () => {
   }
 };
 
-// プロフィールテーブルを作成するRPC関数 (変更なし)
+// プロフィールテーブルを作成するRPC関数
 export const createProfilesTable = async () => {
   try {
     const { error: rpcError } = await supabase.rpc('create_profiles_table');
     if (rpcError) {
+      // errorオブジェクトにstatusがあれば404判定
+      if ((rpcError as any).status === 404 || rpcError.message.includes('does not exist')) {
+        alert('Error: profilesテーブルが見つかりません。Supabaseマイグレーションが未適用の可能性があります。マイグレーションを確認してください。');
+        console.warn('profilesテーブルが存在しません。マイグレーションを再確認してください。');
+        return { success: false, error: rpcError };
+      }
       const createRpcSQL = `...`; // (省略 - RLSポリシーは UUID(user_id) ベースが前提)
       console.log('Creating profiles table RPC function:', createRpcSQL);
-      alert('プロフィールテーブルの作成が必要です。管理者にお問い合わせください。');
-      return { success: false, error: 'RPC function not available' };
+      return { success: false, error: rpcError };
     }
     return { success: true };
   } catch (error) {
@@ -86,7 +91,7 @@ export const createProfilesTable = async () => {
   }
 };
 
-// 認証状態を確認する関数 (変更なし)
+// 認証状態を確認する関数
 export const checkUser = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
@@ -98,7 +103,7 @@ export const checkUser = async () => {
   }
 };
 
-// サインイン関数 (変更なし)
+// サインイン関数
 export const signIn = async (email: string, password: string) => {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -106,10 +111,16 @@ export const signIn = async (email: string, password: string) => {
       password,
     });
     if (error) throw error;
+    // ログイン成功後にprofilesテーブルの存在を確認・作成
+    try {
+      await createProfilesTable();
+    } catch (tableError) {
+      console.warn('profilesテーブルの確認中にエラー:', tableError);
+    }
     return { data };
   } catch (error) {
     console.error('Error signing in:', error);
-    throw error; // エラーを呼び出し元に伝える
+    throw error; // エラーは呼び出し元へ伝える
   }
 };
 

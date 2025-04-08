@@ -1,4 +1,4 @@
-  import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
   import { Link, useLocation, useNavigate } from 'react-router-dom';
   import { 
     Barcode, 
@@ -255,12 +255,12 @@
         {/* main container：サイドバーは固定、メインコンテンツのみスクロール */}
         <div className="flex flex-1 overflow-hidden">
           {/* Desktop Sidebar：fixedで左に固定 */}
-          <div className="hidden md:block fixed top-0 left-0 h-screen w-64 bg-white shadow-sm z-30">
+          <div className="hidden md:block fixed top-0 left-0 h-screen w-64 bg-white shadow-sm z-30 pt-20">
             {/* サイドバーコンテンツ - ログイン状態に関わらず全て表示 */}
             <div className="py-4">
               {/* メニュー - ホームだけを残す */}
               <div className="px-4 mb-6">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                <div className="mt-4 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                   メニュー
                 </div>
                 <nav className="space-y-1">

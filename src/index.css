@@ -91,3 +91,9 @@
   backdrop-filter: invert(100%);
   animation: move 2s ease-in-out infinite;
 }
+
+/* モーダル表示時にヘッダーとサイドバーを薄く表示 */
+body.modal-open .fixed.z-50,
+body.modal-open .fixed.z-30 {
+  filter: brightness(50%);
+}

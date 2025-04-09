@@ -236,6 +236,30 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
       window.dispatchEvent(new CustomEvent('selectedEventChanged'));
     }, [fetchAvailableItems]);
 
+    // 新規: アイテム一括操作用の関数
+    const handleBulkOperation = async (otherEventId: string) => {
+      try {
+        if (!otherEventId) {  // 初期設定選択時は選択状態を解除
+          setSelectedItemIds([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from('control')
+          .select('item_id')
+          .eq('event_id', otherEventId);
+        if (error) throw error;
+        // 取得した他イベントの登録済みitem_id一覧
+        const copiedIds = new Set(data?.map(record => record.item_id));
+        // 現在の利用可能アイテム(items)との交差集合
+        const selectedIds = items
+          .filter(item => copiedIds.has(item.item_id))
+          .map(item => item.item_id);
+        setSelectedItemIds(selectedIds);
+      } catch (error) {
+        console.error('Error in bulk operation:', error);
+      }
+    };
+
     // --- アイテム選択ハンドラ ---
     const handleItemSelection = (itemId: string) => { // 古い varchar ID を受け取る
       setSelectedItemIds(prev => {
@@ -414,6 +438,33 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
             ))}
           </select>
         </div>
+
+        {/* 新規: アイテム一括操作のプルダウン */}
+        {selectedEventId && (
+          <div className="mb-6">
+            <label htmlFor="batch-select" className="block text-sm font-medium text-gray-700 mb-2">
+              アイテム一括操作
+            </label>
+            <select
+              id="batch-select"
+              onChange={(e) => {
+                const otherEventId = e.target.value;
+                handleBulkOperation(otherEventId);
+              }}
+              defaultValue=""
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">別のイベントからコピーする</option>
+              {events
+                .filter(ev => ev.event_id !== selectedEventId)
+                .map(ev => (
+                  <option key={ev.id} value={ev.event_id}>
+                    {ev.event_id} - {ev.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         {/* アイテム選択 */}
         {selectedEventId && (

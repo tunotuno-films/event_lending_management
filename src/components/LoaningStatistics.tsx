@@ -86,6 +86,14 @@ export default function LoaningStatistics() {
     }
   }, [selectedEventId]);
 
+  // 初回レンダリング時にlocalStorageから読み込み
+  useEffect(() => {
+    const storedEventId = localStorage.getItem('selectedEventId');
+    if (storedEventId) {
+      setSelectedEventId(storedEventId);
+    }
+  }, []);
+
   const fetchEvents = async () => {
     try {
       // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
@@ -281,7 +289,11 @@ export default function LoaningStatistics() {
           </label>
           <select
             value={selectedEventId}
-            onChange={(e) => setSelectedEventId(e.target.value)}
+            onChange={(e) => {
+              setSelectedEventId(e.target.value);
+              localStorage.setItem('selectedEventId', e.target.value);
+              window.dispatchEvent(new CustomEvent('selectedEventChanged'));
+            }}
             className="w-full border border-gray-300 rounded-md p-2"
           >
             <option value="">イベントを選択してください</option>

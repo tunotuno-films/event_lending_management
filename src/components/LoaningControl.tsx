@@ -248,6 +248,7 @@ export default function LoaningControl() {
   // ★ イベント選択変更時の処理を修正
   const handleEventChange = useCallback((selectedOldEventId: string) => {
     setSelectedEventId(selectedOldEventId); // 古いIDを保持 (UI選択用)
+    localStorage.setItem('selectedEventId', selectedOldEventId); // localStorageに保存
     // 選択された古いIDに対応する新しいID(int8)を探してステートにセット
     const selectedEvent = events.find(event => event.event_id === selectedOldEventId);
     setSelectedEventRefId(selectedEvent ? selectedEvent.id : null);
@@ -256,6 +257,14 @@ export default function LoaningControl() {
     if (selectedOldEventId) {
       fetchItems();
     }
+
+    if (selectedEvent) {
+      localStorage.setItem('selectedEventInfo', JSON.stringify({ event_id: selectedEvent.event_id, name: selectedEvent.name }));
+    } else {
+      localStorage.removeItem('selectedEventInfo');
+    }
+
+    window.dispatchEvent(new CustomEvent('selectedEventChanged'));
   }, [events, fetchItems]);
 
   // useEffect for item fetch - selectedEventIdが変更されたときのみ実行されるようにする
@@ -277,6 +286,14 @@ export default function LoaningControl() {
 
     return () => clearInterval(intervalId);
   }, [selectedEventId, fetchItems]);
+
+  // 新規: 初回レンダリング時にlocalStorageから選択イベントを読み込む
+  useEffect(() => {
+    const storedEventId = localStorage.getItem('selectedEventId');
+    if (storedEventId) {
+      handleEventChange(storedEventId);
+    }
+  }, []);
 
   // --- 貸出処理 (修正) ---
   const handleLoanItem = async (controlRecord: Control) => {

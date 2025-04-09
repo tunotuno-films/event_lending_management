@@ -193,7 +193,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
       }
     }, [selectedEventId]); // selectedEventId が変更されたら実行
 
-    // --- 初期表示 & イベント変更時のアイテム取得 ---
+    // --- 初回表示 & イベント変更時のアイテム取得 ---
     useEffect(() => {
       fetchEvents();
     }, [fetchEvents]);
@@ -202,11 +202,39 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
       fetchAvailableItems();
     }, [fetchAvailableItems]); // fetchAvailableItems が変更されたら実行
 
+    // 新規: 初回レンダリング時にlocalStorageからイベントIDを読み込む
+    useEffect(() => {
+      const storedEventId = localStorage.getItem('selectedEventId');
+      if (storedEventId) {
+        setSelectedEventId(storedEventId);
+        handleEventChange(storedEventId);
+      }
+    }, []);
+
+    // カスタムイベントリスナーを追加
+    useEffect(() => {
+      const handleSelectedEventChanged = () => {
+        const storedEventId = localStorage.getItem('selectedEventId');
+        if (storedEventId) {
+          setSelectedEventId(storedEventId);
+        } else {
+          setSelectedEventId('');
+        }
+      };
+      window.addEventListener('selectedEventChanged', handleSelectedEventChanged);
+      return () => window.removeEventListener('selectedEventChanged', handleSelectedEventChanged);
+    }, []);
+
     // --- イベント選択ハンドラ ---
-    const handleEventChange = (eventId: string) => {
-      setSelectedEventId(eventId); // 古い varchar ID をステートに保持
-      // fetchAvailableItems が useEffect で自動的に呼び出される
-    };
+    const handleEventChange = useCallback((selectedOldEventId: string) => {
+      setSelectedEventId(selectedOldEventId);
+      localStorage.setItem('selectedEventId', selectedOldEventId);
+      if (selectedOldEventId) {
+        fetchAvailableItems();
+      }
+      // 追加: カスタムイベントを発行してヘッダーに変更を通知
+      window.dispatchEvent(new CustomEvent('selectedEventChanged'));
+    }, [fetchAvailableItems]);
 
     // --- アイテム選択ハンドラ ---
     const handleItemSelection = (itemId: string) => { // 古い varchar ID を受け取る
@@ -227,7 +255,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
       }
     };
 
-    // --- 登録処理 (大幅修正) ---
+    // --- 登録処理  ---
     const handleSubmit = async () => {
       if (!selectedEventId || selectedItemIds.length === 0) {
         setNotification({ show: true, message: 'イベントと登録するアイテムを選択してください', type: 'error' });

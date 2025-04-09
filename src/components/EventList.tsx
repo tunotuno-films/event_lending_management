@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react';
+import { Pencil, Trash2, X, AlertCircle, Undo2, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Event {
   event_id: string;
@@ -190,6 +191,8 @@ export default function EventsList() {
   const [sortColumn, setSortColumn] = useState<string>('event_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedForNavigation, setSelectedForNavigation] = useState<Event | null>(null);
+  const navigate = useNavigate();
 
   const sortedEvents = useMemo(() => {
     if (!sortColumn) return events;
@@ -435,7 +438,11 @@ export default function EventsList() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedEvents.map((event) => (
-              <tr key={event.event_id} className="hover:bg-gray-50">
+              <tr 
+                key={event.event_id} 
+                className="hover:bg-gray-50 cursor-pointer"
+                onClick={() => setSelectedForNavigation(event)}
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
                 </td>
@@ -447,7 +454,7 @@ export default function EventsList() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                   <button
-                    onClick={() => setEditingEvent(event)}
+                    onClick={(e) => { e.stopPropagation(); setEditingEvent(event); }}
                     className="text-blue-600 hover:text-blue-900"
                   >
                     <Pencil size={16} />
@@ -455,7 +462,7 @@ export default function EventsList() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                   <button
-                    onClick={() => setDeletingEvent(event)}
+                    onClick={(e) => { e.stopPropagation(); setDeletingEvent(event); }}
                     className="text-red-600 hover:text-red-900"
                   >
                     <Trash2 size={16} />
@@ -481,6 +488,35 @@ export default function EventsList() {
           onClose={() => setDeletingEvent(null)}
           onConfirm={() => handleDeleteEvent(deletingEvent)}
         />
+      )}
+
+      {selectedForNavigation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">貸出管理に移動しますか？</h3>
+            <p className="text-gray-600 mb-6">
+              イベントID「{selectedForNavigation.event_id}」の貸出管理ページに移動しますか？
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setSelectedForNavigation(null)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+              >
+                <X size={16} /> <span>キャンセル</span>
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('selectedEventId', selectedForNavigation.event_id);
+                  setSelectedForNavigation(null);
+                  navigate('/loaning/control');
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center gap-2"
+              >
+                <ArrowRight size={16} /> <span>移動する</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

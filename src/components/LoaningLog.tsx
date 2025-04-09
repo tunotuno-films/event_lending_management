@@ -90,6 +90,14 @@ export default function LoaningLog() {
     }
   }, [selectedEventId]);
 
+  // 初回ロード時にlocalStorageから選択イベントを取得
+  useEffect(() => {
+    const storedEventId = localStorage.getItem('selectedEventId');
+    if (storedEventId) {
+      setSelectedEventId(storedEventId);
+    }
+  }, []);
+
   const fetchEvents = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -323,7 +331,11 @@ export default function LoaningLog() {
           </label>
           <select
             value={selectedEventId}
-            onChange={(e) => setSelectedEventId(e.target.value)}
+            onChange={(e) => {
+              setSelectedEventId(e.target.value);
+              localStorage.setItem('selectedEventId', e.target.value);
+              window.dispatchEvent(new CustomEvent('selectedEventChanged'));
+            }}
             className="w-full border border-gray-300 rounded-md p-2"
           >
             <option value="">イベントを選択してください</option>

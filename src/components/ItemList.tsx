@@ -327,38 +327,102 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
-  // 初期値を item_id の昇順に設定
-  const [sortColumn, setSortColumn] = useState<string>('item_id');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  // 新規: 検索用の状態を追加
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Item | 'item_info' | 'details'; direction: 'asc' | 'desc' } | null>({ key: 'item_id', direction: 'asc' });
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
 
-  // ソート状態に基づいてitemsを整列
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWideScreen(window.innerWidth >= 1800);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const sortedItems = useMemo(() => {
-    if (!sortColumn) return items;
-    return items.slice().sort((a, b) => {
-      let aVal = a[sortColumn as keyof Item];
-      let bVal = b[sortColumn as keyof Item];
-      if (sortColumn === 'registered_date') {
+    if (!sortConfig) return items;
+
+    let sortKey: keyof Item;
+    if (sortConfig.key === 'item_info') {
+      sortKey = 'item_id';
+    } else if (sortConfig.key === 'details') {
+      sortKey = 'genre';
+    } else {
+      sortKey = sortConfig.key as keyof Item;
+    }
+
+    return [...items].sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (sortKey === 'registered_date') {
         const aDate = new Date(aVal as string);
         const bDate = new Date(bVal as string);
-        if (aDate < bDate) return sortDirection === 'asc' ? -1 : 1;
-        if (aDate > bDate) return sortDirection === 'asc' ? 1 : -1;
+        if (aDate < bDate) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aDate > bDate) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       }
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+
+      if (sortKey === 'item_id') {
+        const numA = parseInt(aVal as string, 10);
+        const numB = parseInt(bVal as string, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+        }
+      }
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
       return 0;
     });
-  }, [items, sortColumn, sortDirection]);
+  }, [items, sortConfig]);
 
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
+  const handleSort = (column: keyof Item | 'item_info' | 'details') => {
+    setSortConfig(prevConfig => {
+      const isCurrentColumn = prevConfig?.key === column;
+      const currentDirection = prevConfig?.direction;
+
+      if (isWideScreen) {
+        if (column === 'item_info' || column === 'details') {
+          return prevConfig;
+        }
+        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+        return { key: column, direction: direction };
+      } else {
+        if (column === 'item_info') {
+          if (prevConfig?.key === 'item_id' && currentDirection === 'asc') {
+            return { key: 'item_id', direction: 'desc' };
+          } else if (prevConfig?.key === 'item_id' && currentDirection === 'desc') {
+            return { key: 'name', direction: 'asc' };
+          } else if (prevConfig?.key === 'name' && currentDirection === 'asc') {
+            return { key: 'name', direction: 'desc' };
+          } else {
+            return { key: 'item_id', direction: 'asc' };
+          }
+        } else if (column === 'details') {
+          if (prevConfig?.key === 'genre' && currentDirection === 'asc') {
+            return { key: 'genre', direction: 'desc' };
+          } else if (prevConfig?.key === 'genre' && currentDirection === 'desc') {
+            return { key: 'manager', direction: 'asc' };
+          } else if (prevConfig?.key === 'manager' && currentDirection === 'asc') {
+            return { key: 'manager', direction: 'desc' };
+          } else {
+            return { key: 'genre', direction: 'asc' };
+          }
+        } else {
+          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: column, direction: direction };
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -390,7 +454,6 @@ export default function ItemList() {
     }
   };
 
-  // 新規: 非同期で検索する関数
   const handleSearch = async () => {
     if (searchQuery.trim() === '') {
       fetchItems();
@@ -410,7 +473,6 @@ export default function ItemList() {
     }
   };
 
-  // 新規: 検索入力の変化を監視して非同期で検索
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       handleSearch();
@@ -424,7 +486,7 @@ export default function ItemList() {
         .from('items')
         .update({
           name: updatedItem.name,
-          image: updatedItem.image || null, // 空文字列の場合はnullに
+          image: updatedItem.image || null,
           genre: updatedItem.genre,
           manager: updatedItem.manager
         })
@@ -514,7 +576,6 @@ export default function ItemList() {
     });
   };
 
-  // CSV用エスケープ関数を修正：nullの場合は空文字を返す
   const escapeCSV = (value: string | null): string => {
     if (!value) return '';
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -523,7 +584,6 @@ export default function ItemList() {
     return value;
   };
 
-  // CSVエクスポート処理の実装を修正
   const handleCSVExport = () => {
     let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
     items.forEach(item => {
@@ -534,7 +594,6 @@ export default function ItemList() {
     const a = document.createElement('a');
     a.href = url;
     
-    // ファイル名をyyyyMMdd_物品一覧.csv形式で作成
     const today = new Date();
     const yyyy = today.getFullYear().toString();
     const mm = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -545,6 +604,55 @@ export default function ItemList() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const getSortIndicator = (targetKey: keyof Item | 'item_info' | 'details') => {
+    if (!sortConfig) return null;
+
+    let isActive = false;
+    let direction = sortConfig.direction;
+    let displayKey: string = '';
+
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+      displayKey = '';
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'name' ? '物品名' : '';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+        displayKey = sortConfig.key === 'genre' ? 'ジャンル' : sortConfig.key === 'manager' ? '管理者' : '';
+      } else {
+        isActive = sortConfig.key === targetKey;
+        displayKey = '';
+      }
+    }
+
+    if (!isActive) return null;
+
+    const arrow = direction === 'asc' ? '↑' : '↓';
+    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
+  };
+
+  const getSortBgColor = (targetKey: keyof Item | 'item_info' | 'details') => {
+    if (!sortConfig) return '';
+
+    let isActive = false;
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+      } else {
+        isActive = sortConfig.key === targetKey;
+      }
+    }
+
+    if (!isActive) return '';
+    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
   };
 
   if (loading) {
@@ -580,7 +688,6 @@ export default function ItemList() {
         </div>
       </div>
   
-      {/* 新規: タイトル直後、表の上に検索入力欄を配置 */}
       <div className="mb-4">
         <input
           type="text"
@@ -598,47 +705,47 @@ export default function ItemList() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 画像
               </th>
-              {/* ★ ヘッダーを「物品情報」に変更 */}
               <th
-                onClick={() => handleSort('item_id')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='item_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                onClick={() => !isWideScreen && handleSort('item_info')}
+                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
               >
-                物品情報 {sortColumn==='item_id' && (
-                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              {/* ★ 物品名ヘッダーを1800px以上で表示 */}
-              <th
-                onClick={() => handleSort('name')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-              >
-                物品名 {sortColumn==='name' && (
-                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                )}
+                {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
               </th>
               <th
-                onClick={() => handleSort('genre')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='genre' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                onClick={() => isWideScreen && handleSort('item_id')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
               >
-                ジャンル {sortColumn==='genre' && (
-                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                )}
+                物品ID {getSortIndicator('item_id')}
               </th>
               <th
-                onClick={() => handleSort('manager')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='manager' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                onClick={() => isWideScreen && handleSort('name')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('name')}`}
               >
-                管理者 {sortColumn==='manager' && (
-                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                )}
+                物品名 {getSortIndicator('name')}
+              </th>
+              <th
+                onClick={() => !isWideScreen && handleSort('details')}
+                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('details')}`}
+              >
+                {!getSortIndicator('details') && '詳細情報'} {getSortIndicator('details')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('genre')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('genre')}`}
+              >
+                ジャンル {getSortIndicator('genre')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('manager')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('manager')}`}
+              >
+                管理者 {getSortIndicator('manager')}
               </th>
               <th
                 onClick={() => handleSort('registered_date')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='registered_date' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('registered_date')}`}
               >
-                登録日 {sortColumn==='registered_date' && (
-                  <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                )}
+                登録日 {getSortIndicator('registered_date')}
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 編集
@@ -661,28 +768,36 @@ export default function ItemList() {
                     />
                   </div>
                 </td>
-                {/* ★ 物品情報セル */}
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {/* 1800px未満での表示 (縦積み) */}
-                  <div className="flex flex-col min-[1800px]:hidden">
+                <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                  <div className="flex flex-col">
                     <span className="text-sm font-mono">{item.item_id}</span>
                     <span className="text-xs text-gray-600">{item.name}</span>
                   </div>
-                  {/* 1800px以上での表示 (IDのみ) */}
-                  <div className="hidden min-[1800px]:block text-sm font-mono">
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-mono">
                     {item.item_id}
                   </div>
                 </td>
-                {/* ★ 物品名セル (1800px以上で表示) */}
                 <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{item.name}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                  <div className="flex flex-col">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 mb-1 w-fit">
+                      {item.genre}
+                    </span>
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 w-fit">
+                      {item.manager}
+                    </span>
+                  </div>
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                     {item.genre}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
                     {item.manager}
                   </span>
@@ -712,7 +827,6 @@ export default function ItemList() {
         </table>
       </div>
   
-      {/* モーダル部分 */}
       {editingItem && (
         <EditModal
           item={editingItem}

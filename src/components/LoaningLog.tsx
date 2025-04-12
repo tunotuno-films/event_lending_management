@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
-import { AlertCircle, X, Download, ArrowUpDown } from 'lucide-react';
+import { AlertCircle, X, Download } from 'lucide-react';
 
 // ★ デフォルト画像URLを追加
 const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
@@ -90,9 +90,18 @@ export default function LoaningLog() {
     type: 'success'
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: 'item_id' | 'start_datetime' | 'end_datetime';
+    key: keyof LoanRecord | 'item_info';
     direction: 'asc' | 'desc';
   } | null>(null);
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWideScreen(window.innerWidth >= 1800);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -104,7 +113,6 @@ export default function LoaningLog() {
     }
   }, [selectedEventId]);
 
-  // 初回ロード時にlocalStorageから選択イベントを取得
   useEffect(() => {
     const storedEventId = localStorage.getItem('selectedEventId');
     if (storedEventId) {
@@ -158,7 +166,7 @@ export default function LoaningLog() {
         .from('result')
         .select(`
           *,
-          items:item_id_ref(name, image)
+          items:item_id_ref(item_id, name, image)
         `)
         .eq('event_id', selectedEventId)
         .order('start_datetime', { ascending: false });
@@ -184,6 +192,7 @@ export default function LoaningLog() {
       });
 
       setLoanRecords(formattedRecords);
+      setSortConfig({ key: 'start_datetime', direction: 'desc' });
     } catch (error) {
       console.error('Error fetching loan records:', error);
       setNotification({
@@ -194,30 +203,123 @@ export default function LoaningLog() {
     }
   };
 
-  const handleSort = (key: 'item_id' | 'start_datetime' | 'end_datetime') => {
-    let direction: 'asc' | 'desc' = 'asc';
+  const handleSort = (column: keyof LoanRecord | 'item_info') => {
+    setSortConfig(prevConfig => {
+      const isCurrentColumn = prevConfig?.key === column;
+      const currentDirection = prevConfig?.direction;
 
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+      if (isWideScreen) {
+        if (column === 'item_info') return prevConfig;
 
-    setSortConfig({ key, direction });
+        const sortKey = column === 'item' ? 'item' : column;
 
-    const sortedRecords = [...loanRecords].sort((a, b) => {
-      if (key === 'item_id') {
-        return direction === 'asc'
-          ? a.item_id.localeCompare(b.item_id)
-          : b.item_id.localeCompare(a.item_id);
+        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+        return { key: sortKey as keyof LoanRecord, direction: direction };
+
       } else {
-        const aValue = a[key] || '';
-        const bValue = b[key] || '';
-        return direction === 'asc'
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+        if (column === 'item_info') {
+          if (prevConfig?.key === 'item_id' && currentDirection === 'asc') {
+            return { key: 'item_id', direction: 'desc' };
+          } else if (prevConfig?.key === 'item_id' && currentDirection === 'desc') {
+            return { key: 'item', direction: 'asc' };
+          } else if (prevConfig?.key === 'item' && currentDirection === 'asc') {
+            return { key: 'item', direction: 'desc' };
+          } else {
+            return { key: 'item_id', direction: 'asc' };
+          }
+        } else {
+          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: column, direction: direction };
+        }
       }
     });
+  };
 
-    setLoanRecords(sortedRecords);
+  const sortedLoanRecords = useMemo(() => {
+    if (!sortConfig) return loanRecords;
+
+    const sortKey = sortConfig.key;
+
+    return [...loanRecords].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      if (sortKey === 'item') {
+        aVal = a.item?.name || '';
+        bVal = b.item?.name || '';
+      } else if (sortKey === 'item_id') {
+         aVal = a.item_id || '';
+         bVal = b.item_id || '';
+      } else {
+        aVal = a[sortKey as keyof LoanRecord] || '';
+        bVal = b[sortKey as keyof LoanRecord] || '';
+      }
+
+      if (sortKey === 'start_datetime' || sortKey === 'end_datetime') {
+        const aDate = aVal ? new Date(aVal).getTime() : (sortConfig.direction === 'asc' ? Infinity : -Infinity);
+        const bDate = bVal ? new Date(bVal).getTime() : (sortConfig.direction === 'asc' ? Infinity : -Infinity);
+        return aDate - bDate;
+      } else if (sortKey === 'item_id') {
+         const numA = parseInt(aVal, 10);
+         const numB = parseInt(bVal, 10);
+         if (!isNaN(numA) && !isNaN(numB)) {
+            return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+         }
+         return sortConfig.direction === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
+      } else if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else {
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      }
+    });
+  }, [loanRecords, sortConfig]);
+
+  const getSortIndicator = (targetKey: keyof LoanRecord | 'item_info') => {
+    if (!sortConfig) return null;
+
+    let isActive = false;
+    let direction = sortConfig.direction;
+    let displayKey: string = '';
+
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+      displayKey = '';
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item';
+        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'item' ? '物品名' : '';
+      } else {
+        isActive = sortConfig.key === targetKey;
+        displayKey = '';
+      }
+    }
+
+    if (!isActive) return null;
+
+    const arrow = direction === 'asc' ? '↑' : '↓';
+    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
+  };
+
+  const getSortBgColor = (targetKey: keyof LoanRecord | 'item_info') => {
+    if (!sortConfig) return '';
+
+    let isActive = false;
+    if (isWideScreen) {
+       isActive = sortConfig.key === targetKey;
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item';
+      } else {
+        isActive = sortConfig.key === targetKey;
+      }
+    }
+
+    if (!isActive) return '';
+    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
   };
 
   const handleDeleteShortLoans = async () => {
@@ -308,7 +410,6 @@ export default function LoaningLog() {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
 
-    // ファイル名を「yyyymmdd_貸出履歴_イベントid-イベント名.csv」形式に変更
     const today = new Date();
     const yyyy = today.getFullYear().toString();
     const mm = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -392,79 +493,85 @@ export default function LoaningLog() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     画像
                   </th>
-                  {/* ヘッダーを「物品情報」に変更 */}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <button
-                      onClick={() => handleSort('item_id')}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      物品情報
-                      <ArrowUpDown size={14} />
+                  <th
+                    onClick={() => !isWideScreen && handleSort('item_info')}
+                    className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
+                  >
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
                     </button>
                   </th>
-                  {/* 物品名ヘッダーを1800px以上で表示 */}
-                  <th className="hidden min-[1800px]:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    物品名
+                  <th
+                    onClick={() => isWideScreen && handleSort('item_id')}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
+                  >
+                     <button className="flex items-center gap-1 hover:text-gray-700">
+                       物品ID {getSortIndicator('item_id')}
+                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    onClick={() => isWideScreen && handleSort('item')}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item')}`}
+                  >
+                     <button className="flex items-center gap-1 hover:text-gray-700">
+                       物品名 {getSortIndicator('item')}
+                     </button>
+                  </th>
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('start_datetime')}`}>
                     <button
                       onClick={() => handleSort('start_datetime')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       貸出時間
-                      <ArrowUpDown size={14} />
+                      {getSortIndicator('start_datetime')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('end_datetime')}`}>
                     <button
                       onClick={() => handleSort('end_datetime')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       返却時間
-                      <ArrowUpDown size={14} />
+                      {getSortIndicator('end_datetime')}
                     </button>
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {loanRecords.map((record) => (
+                {sortedLoanRecords.map((record) => (
                   <tr key={record.result_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
                         <img
-                          // ★ getItemImageUrl を使用
                           src={getItemImageUrl(record.item?.image)}
                           alt={record.item?.name || 'アイテム画像'}
                           className="max-h-full max-w-full object-contain"
-                          // ★ onError ハンドラを追加
                           onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                         />
                       </div>
                     </td>
-                    {/* 物品情報セル */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {/* 1800px未満での表示 (縦積み) */}
-                      <div className="flex flex-col min-[1800px]:hidden">
+                    <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                      <div className="flex flex-col">
                         <span className="text-sm font-mono">{record.item_id || '-'}</span>
                         <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
                       </div>
-                      {/* 1800px以上での表示 (IDのみ) */}
-                      <div className="hidden min-[1800px]:block text-sm font-mono">
+                    </td>
+                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm font-mono">
                         {record.item_id || '-'}
                       </div>
                     </td>
-                    {/* 物品名セル (1800px以上で表示) */}
                     <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">{record.item?.name || '不明なアイテム'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
+                       <div className="text-sm">
                         {formatJSTDateTime(record.start_datetime)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        {record.end_datetime 
+                       <div className="text-sm">
+                        {record.end_datetime
                           ? formatJSTDateTime(record.end_datetime)
                           : <span className="text-yellow-500">未返却</span>
                         }

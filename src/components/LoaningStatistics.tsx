@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertCircle, X, Download, ArrowUpDown } from 'lucide-react';
+import { AlertCircle, X, Download } from 'lucide-react';
 
 const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
@@ -85,11 +85,20 @@ export default function LoaningStatistics() {
     type: 'success'
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: 'item_id' | 'item_name' | 'loan_count' | 'total_duration' | 'average_duration';
+    key: keyof ItemStatistics | 'item_info';
     direction: 'asc' | 'desc';
   } | null>(null);
   const [mergeByName, setMergeByName] = useState(false);
   const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWideScreen(window.innerWidth >= 1800);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -285,37 +294,119 @@ export default function LoaningStatistics() {
       let aValue: string | number;
       let bValue: string | number;
 
-      if (mergeByName && sortKey === 'item_id') {
-        aValue = a.original_item_ids ? parseInt(a.original_item_ids[0], 10) : 0;
-        bValue = b.original_item_ids ? parseInt(b.original_item_ids[0], 10) : 0;
-      } else {
-        aValue = a[sortKey];
-        bValue = b[sortKey];
+      let actualSortKey: keyof ItemStatistics = 'item_id';
+      if (sortKey === 'item_id' || (sortKey === 'item_info' && (sortConfig.key === 'item_id' || !isWideScreen))) {
+        actualSortKey = 'item_id';
+      } else if (sortKey === 'item_name' || (sortKey === 'item_info' && sortConfig.key === 'item_name')) {
+        actualSortKey = 'item_name';
+      } else if (sortKey !== 'item_info') {
+        actualSortKey = sortKey as keyof ItemStatistics;
       }
 
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortConfig.direction === 'asc'
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+      if (actualSortKey === 'item_id') {
+        if (mergeByName) {
+          aValue = a.original_item_ids ? parseInt(a.original_item_ids[0], 10) : 0;
+          bValue = b.original_item_ids ? parseInt(b.original_item_ids[0], 10) : 0;
+        } else {
+          aValue = parseInt(a.item_id, 10);
+          bValue = parseInt(b.item_id, 10);
+        }
+      } else if (actualSortKey === 'item_name') {
+        aValue = a.item_name;
+        bValue = b.item_name;
+      } else {
+        const rawAValue = a[actualSortKey];
+        const rawBValue = b[actualSortKey];
+        aValue = (typeof rawAValue === 'string' || typeof rawAValue === 'number') ? rawAValue : 0;
+        bValue = (typeof rawBValue === 'string' || typeof rawBValue === 'number') ? rawBValue : 0;
       }
+
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         return sortConfig.direction === 'asc'
           ? aValue - bValue
           : bValue - aValue;
       }
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
 
       return 0;
     });
-  }, [displayStatistics, sortConfig, mergeByName]);
+  }, [displayStatistics, sortConfig, mergeByName, isWideScreen]);
 
-  const handleSort = (key: 'item_id' | 'item_name' | 'loan_count' | 'total_duration' | 'average_duration') => {
-    let direction: 'asc' | 'desc' = 'asc';
-    const currentKey = key;
+  const handleSort = (column: keyof ItemStatistics | 'item_info') => {
+    setSortConfig(prevConfig => {
+      const isCurrentColumn = prevConfig?.key === column;
+      const currentDirection = prevConfig?.direction;
 
-    if (sortConfig && sortConfig.key === currentKey && sortConfig.direction === 'asc') {
-      direction = 'desc';
+      if (isWideScreen) {
+        if (column === 'item_info') return prevConfig;
+
+        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+        return { key: column, direction: direction };
+      } else {
+        if (column === 'item_info') {
+          if (prevConfig?.key === 'item_id' && currentDirection === 'asc') {
+            return { key: 'item_id', direction: 'desc' };
+          } else if (prevConfig?.key === 'item_id' && currentDirection === 'desc') {
+            return { key: 'item_name', direction: 'asc' };
+          } else if (prevConfig?.key === 'item_name' && currentDirection === 'asc') {
+            return { key: 'item_name', direction: 'desc' };
+          } else {
+            return { key: 'item_id', direction: 'asc' };
+          }
+        } else {
+          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: column, direction: direction };
+        }
+      }
+    });
+  };
+
+  const getSortIndicator = (targetKey: keyof ItemStatistics | 'item_info') => {
+    if (!sortConfig) return null;
+
+    let isActive = false;
+    let direction = sortConfig.direction;
+    let displayKey: string = '';
+
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+      displayKey = '';
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item_name';
+        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'item_name' ? '物品名' : '';
+      } else {
+        isActive = sortConfig.key === targetKey;
+        displayKey = '';
+      }
     }
-    setSortConfig({ key: currentKey, direction });
+
+    if (!isActive) return null;
+
+    const arrow = direction === 'asc' ? '↑' : '↓';
+    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
+  };
+
+  const getSortBgColor = (targetKey: keyof ItemStatistics | 'item_info') => {
+    if (!sortConfig) return '';
+
+    let isActive = false;
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item_name';
+      } else {
+        isActive = sortConfig.key === targetKey;
+      }
+    }
+
+    if (!isActive) return '';
+    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
   };
 
   const formatDuration = (seconds: number) => {
@@ -461,49 +552,55 @@ export default function LoaningStatistics() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     画像
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <button
-                      onClick={() => handleSort('item_id')}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      物品情報
-                      <ArrowUpDown size={14} />
+                  <th
+                    onClick={() => !isWideScreen && handleSort('item_info')}
+                    className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
+                  >
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
                     </button>
                   </th>
-                  <th className="hidden min-[1800px]:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <button
-                      onClick={() => handleSort('item_name')}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      物品名
-                      <ArrowUpDown size={14} />
+                  <th
+                    onClick={() => isWideScreen && handleSort('item_id')}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
+                  >
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      物品ID {getSortIndicator('item_id')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    onClick={() => isWideScreen && handleSort('item_name')}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_name')}`}
+                  >
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      物品名 {getSortIndicator('item_name')}
+                    </button>
+                  </th>
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('loan_count')}`}>
                     <button
                       onClick={() => handleSort('loan_count')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       貸出回数
-                      <ArrowUpDown size={14} />
+                      {getSortIndicator('loan_count')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('total_duration')}`}>
                     <button
                       onClick={() => handleSort('total_duration')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       総貸出時間
-                      <ArrowUpDown size={14} />
+                      {getSortIndicator('total_duration')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('average_duration')}`}>
                     <button
                       onClick={() => handleSort('average_duration')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       平均貸出時間
-                      <ArrowUpDown size={14} />
+                      {getSortIndicator('average_duration')}
                     </button>
                   </th>
                 </tr>
@@ -544,8 +641,8 @@ export default function LoaningStatistics() {
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col min-[1800px]:hidden">
+                      <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                        <div className="flex flex-col">
                           <div className="flex items-baseline">
                             <div className="text-sm font-mono">
                               {displayItemId}
@@ -554,7 +651,9 @@ export default function LoaningStatistics() {
                           </div>
                           <span className="text-xs text-gray-600">{stat.item_name}</span>
                         </div>
-                        <div className="hidden min-[1800px]:flex items-baseline">
+                      </td>
+                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-baseline">
                           <div className="text-sm font-mono">
                             {displayItemId}
                           </div>

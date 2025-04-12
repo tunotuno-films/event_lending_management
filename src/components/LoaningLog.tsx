@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
 import { AlertCircle, X, Download, ArrowUpDown } from 'lucide-react';
 
+// ★ デフォルト画像URLを追加
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+
 interface Event {
   event_id: string;
   name: string;
@@ -64,6 +67,17 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
       </div>
     </div>
   );
+};
+
+// ★ 画像URLヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null | undefined): string => {
+  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
 };
 
 export default function LoaningLog() {
@@ -414,18 +428,15 @@ export default function LoaningLog() {
                 {loanRecords.map((record) => (
                   <tr key={record.result_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                        {record.item?.image ? (
-                          <img
-                            src={record.item.image}
-                            alt={record.item.name || 'アイテム画像'}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                            <span className="text-xs text-gray-400">画像なし</span>
-                          </div>
-                        )}
+                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
+                        <img
+                          // ★ getItemImageUrl を使用
+                          src={getItemImageUrl(record.item?.image)}
+                          alt={record.item?.name || 'アイテム画像'}
+                          className="max-h-full max-w-full object-contain"
+                          // ★ onError ハンドラを追加
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                        />
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

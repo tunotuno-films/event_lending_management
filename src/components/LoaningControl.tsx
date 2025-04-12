@@ -3,6 +3,9 @@ import { supabase, insertWithOwnerId } from '../lib/supabase'; // getCurrentUser
 import { AlertCircle, X, Barcode, StopCircle } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 
+// ★ デフォルト画像URLを追加
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+
 // --- インターフェース定義 (修正) ---
 interface Event {
   id: number; // 新しい主キー
@@ -91,6 +94,17 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
       </div>
     </div>
   );
+};
+
+// ★ 画像URLヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null | undefined): string => {
+  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
 };
 
 export default function LoaningControl() {
@@ -658,11 +672,12 @@ export default function LoaningControl() {
                       {matchingItems.map((item) => (
                         <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                           <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white">
+                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border">
                               <img
-                                src={item.items?.image || 'https://via.placeholder.com/150'}
+                                src={getItemImageUrl(item.items?.image)}
                                 alt={item.items?.name || '物品画像'}
                                 className="max-h-full max-w-full object-contain"
+                                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                               />
                             </div>
                             <span className="text-sm font-mono">{item.item_id}</span>
@@ -745,11 +760,12 @@ export default function LoaningControl() {
                       {matchingItems.map((item) => (
                         <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                           <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white">
+                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border">
                               <img
-                                src={item.items?.image || 'https://via.placeholder.com/150'}
+                                src={getItemImageUrl(item.items?.image)}
                                 alt={item.items?.name || '物品画像'}
                                 className="max-h-full max-w-full object-contain"
+                                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                               />
                             </div>
                             <span className="text-sm font-mono">{item.item_id}</span>
@@ -801,7 +817,14 @@ export default function LoaningControl() {
                         waitingItems.map((control) => (
                           <tr key={control.control_id}>
                             <td className="px-4 py-2">
-                              <div className="h-10 w-10 rounded overflow-hidden border">{control.items?.image ? <img src={control.items.image} alt="アイテム画像" /> : <span>?</span>}</div>
+                              <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                <img
+                                  src={getItemImageUrl(control.items?.image)}
+                                  alt={control.items?.name || 'アイテム画像'}
+                                  className="max-h-full max-w-full object-contain"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                                />
+                              </div>
                             </td>
                             <td className="px-4 py-2"><span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span></td>
                             <td className="px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
@@ -844,7 +867,14 @@ export default function LoaningControl() {
                         loanedItems.map((control) => (
                           <tr key={control.control_id}>
                             <td className="px-4 py-2">
-                              <div className="h-10 w-10 rounded overflow-hidden border">{control.items?.image ? <img src={control.items.image} alt="アイテム画像" /> : <span>?</span>}</div>
+                              <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                <img
+                                  src={getItemImageUrl(control.items?.image)}
+                                  alt={control.items?.name || 'アイテム画像'}
+                                  className="max-h-full max-w-full object-contain"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                                />
+                              </div>
                             </td>
                             <td className="px-4 py-2"><span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span></td>
                             <td className="px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>

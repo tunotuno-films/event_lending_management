@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, ArrowUpDown } from 'lucide-react';
 
+// ★ デフォルト画像URLを追加
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+
 interface Event {
   event_id: string;
   name: string;
@@ -61,6 +64,17 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
 const HOURS = Array.from({ length: 24 }, (_, i) => 
   `${i.toString().padStart(2, '0')}:00`
 );
+
+// ★ 画像URLヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null | undefined): string => {
+  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
+};
 
 export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -371,11 +385,12 @@ export default function LoaningStatistics() {
                 {statistics.map((stat) => (
                   <tr key={stat.item_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
                         <img
-                          src={stat.image || 'https://via.placeholder.com/150'}
+                          src={getItemImageUrl(stat.image)}
                           alt={stat.item_name}
                           className="max-h-full max-w-full object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                         />
                       </div>
                     </td>
@@ -432,11 +447,12 @@ export default function LoaningStatistics() {
                         return (
                           <tr key={`heatmap-${stat.item_id}`} className="hover:bg-gray-50">
                             <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
-                              <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                              <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
                                 <img
-                                  src={stat.image || 'https://via.placeholder.com/150'}
+                                  src={getItemImageUrl(stat.image)}
                                   alt={stat.item_name}
                                   className="max-h-full max-w-full object-contain"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                                 />
                               </div>
                             </td>

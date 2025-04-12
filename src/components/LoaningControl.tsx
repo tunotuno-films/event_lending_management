@@ -661,7 +661,6 @@ export default function LoaningControl() {
                     }}
                     placeholder="アイテムIDを入力"
                     className="w-full border border-gray-300 rounded-md p-2 font-mono"
-                    autoFocus
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-2 mb-4">

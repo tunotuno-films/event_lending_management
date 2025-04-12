@@ -897,7 +897,9 @@ export default function LoaningControl() {
                             {/* 物品名セルを1800px以上で表示 */}
                             <td className="hidden min-[1800px]:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
                             <td className="px-4 py-2">
-                              <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50">返却</button>
+                              <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
+                                返却
+                              </button>
                             </td>
                             <td className="px-4 py-2"><span className="text-sm text-red-500">{formatElapsedTime(control.control_datetime)}</span></td>
                           </tr>

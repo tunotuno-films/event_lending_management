@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+    import React, { useState, useEffect } from 'react';
     import { useNavigate } from 'react-router-dom';
     import { supabase, insertWithOwnerId } from '../lib/supabase';
     import { Barcode, StopCircle, X, AlertTriangle, Download, Upload, CheckCircle, Package } from 'lucide-react';
@@ -22,6 +22,12 @@ import React, { useState, useEffect } from 'react';
     manager: string;
     customManager: string;
     image: File | null;
+    }
+
+    interface Item {
+    item_id: string;
+    name: string;
+    image: string | null;
     }
 
     const RegisterItem: React.FC<RegisterItemProps> = ({
@@ -52,6 +58,8 @@ import React, { useState, useEffect } from 'react';
     const [scannerError, setScannerError] = useState(false);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [pendingSubmission, setPendingSubmission] = useState(false);
+    const [matchingItems, setMatchingItems] = useState<Item[]>([]);
+    const [matchingItemsByName, setMatchingItemsByName] = useState<Item[]>([]);
 
     const { ref } = useZxing({
         onDecodeResult(result) {
@@ -156,6 +164,64 @@ import React, { useState, useEffect } from 'react';
         window.removeEventListener('beforeunload', handleBeforeUnload);
         };
     }, []);
+
+    useEffect(() => {
+        const searchExistingItems = async () => {
+        if (formData.barcode.trim() === '') {
+            setMatchingItems([]);
+            return;
+        }
+        try {
+            const { data, error } = await supabase
+            .from('items')
+            .select('item_id, name, image')
+            .ilike('item_id', `%${formData.barcode}%`)
+            .eq('item_deleted', false)
+            .limit(5);
+
+            if (error) throw error;
+            setMatchingItems(data || []);
+        } catch (error) {
+            console.error('Error searching existing items:', error);
+            setMatchingItems([]);
+        }
+        };
+
+        const debounceTimer = setTimeout(() => {
+        searchExistingItems();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [formData.barcode]);
+
+    useEffect(() => {
+        const searchExistingItemsByName = async () => {
+        if (formData.itemName.trim() === '') {
+            setMatchingItemsByName([]);
+            return;
+        }
+        try {
+            const { data, error } = await supabase
+            .from('items')
+            .select('item_id, name, image')
+            .ilike('name', `%${formData.itemName}%`)
+            .eq('item_deleted', false)
+            .limit(5);
+
+            if (error) throw error;
+            setMatchingItemsByName(data || []);
+        } catch (error) {
+            console.error('Error searching existing items by name:', error);
+            setMatchingItemsByName([]);
+        }
+        };
+
+        const debounceTimer = setTimeout(() => {
+        searchExistingItemsByName();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [formData.itemName]);
 
     const fetchExistingData = async () => {
         try {
@@ -392,6 +458,16 @@ import React, { useState, useEffect } from 'react';
         setFormData(prev => ({ ...prev, barcode: numericValue }));
     };
 
+    const handleSelectSuggestion = (name: string) => {
+        setFormData(prev => ({ ...prev, itemName: name }));
+        setMatchingItemsByName([]);
+        setNotification({
+        show: true,
+        message: '物品名を入力しました',
+        type: 'success'
+        });
+    };
+
     return (
         <>
         {notification.show && (
@@ -450,6 +526,40 @@ import React, { useState, useEffect } from 'react';
                 </div>
             </div>
 
+            {matchingItems.length > 0 && (
+                <div className="mt-4 border-t pt-4">
+                <h4 className="text-sm font-semibold mb-2 text-orange-600 flex items-center">
+                    <AlertTriangle size={16} className="inline mr-1" />
+                    部分一致する登録済み物品:
+                </h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
+                    {matchingItems.map((item) => (
+                    <div key={item.item_id} className="flex items-center justify-between bg-white p-2 rounded shadow-sm">
+                        <div className="flex items-center gap-2 overflow-hidden mr-2">
+                        <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
+                            {item.image && item.image.trim() !== '' ? (
+                            <img
+                                src={item.image}
+                                alt={item.name}
+                                className="max-h-full max-w-full object-contain"
+                            />
+                            ) : (
+                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                <Package className="h-5 w-5 text-gray-400" />
+                            </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                            <span className="text-xs font-mono text-gray-700 truncate">{item.item_id}</span>
+                            <span className="text-xs text-gray-500 truncate">{item.name}</span>
+                        </div>
+                        </div>
+                    </div>
+                    ))}
+                </div>
+                </div>
+            )}
+
             {isScanning && (
                 <div className="relative w-full max-w-md aspect-video mb-4 rounded-lg overflow-hidden border-2 border-blue-500">
                 {scannerError ? (
@@ -475,56 +585,49 @@ import React, { useState, useEffect } from 'react';
                 画像
                 </label>
                 
-                {/* Flex container for preview and input */}
                 <div className="flex items-center gap-4">
-                    {/* Image preview container */}
-                    <div className="relative inline-block"> {/* mt-2 を削除 */}
-                        {/* スタイルを物品編集モーダルと統一 */}
-                        <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                        {imagePreview ? (
-                            <img 
-                                src={imagePreview} 
-                                alt="画像プレビュー" 
-                                className="max-h-full max-w-full object-contain" 
-                            />
-                        ) : (
-                            // 画像がない場合のプレースホルダー
-                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                                <Package className="h-10 w-10 text-gray-400" />
-                            </div>
-                        )}
-                        </div>
-                        {/* 画像が選択されている場合のみ削除ボタンを表示 */}
-                        {imagePreview && (
-                            <button
-                            type="button"
-                            onClick={() => {
-                                setImagePreview(null);
-                                setFormData(prev => ({ ...prev, image: null }));
-                                // ファイル入力もリセットする場合
-                                const fileInput = document.getElementById('image-upload') as HTMLInputElement;
-                                if (fileInput) {
-                                    fileInput.value = '';
-                                }
-                            }}
-                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100 border"
-                            aria-label="プレビューを削除"
-                            >
-                            <X size={16} className="text-gray-600" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* File input container */}
-                    <div className="flex-1"> {/* mb-2 を削除し、flex-1 を追加 */}
-                        <input
-                            id="image-upload"
-                            type="file"
-                            accept="image/jpeg, image/png, image/gif, image/webp"
-                            onChange={handleImageChange}
-                            className="w-full border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                <div className="relative inline-block">
+                    <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                    {imagePreview ? (
+                        <img 
+                        src={imagePreview} 
+                        alt="画像プレビュー" 
+                        className="max-h-full max-w-full object-contain" 
                         />
+                    ) : (
+                        <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                        <Package className="h-10 w-10 text-gray-400" />
+                        </div>
+                    )}
                     </div>
+                    {imagePreview && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                        setImagePreview(null);
+                        setFormData(prev => ({ ...prev, image: null }));
+                        const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+                        if (fileInput) {
+                            fileInput.value = '';
+                        }
+                        }}
+                        className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100 border"
+                        aria-label="プレビューを削除"
+                    >
+                        <X size={16} className="text-gray-600" />
+                    </button>
+                    )}
+                </div>
+
+                <div className="flex-1">
+                    <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/jpeg, image/png, image/gif, image/webp"
+                    onChange={handleImageChange}
+                    className="w-full border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                    />
+                </div>
                 </div>
             </div>
 
@@ -540,6 +643,28 @@ import React, { useState, useEffect } from 'react';
                 className="w-full border border-gray-300 rounded-md p-2"
                 required
                 />
+                {matchingItemsByName.length > 0 && (
+                <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                    <h4 className="text-xs font-semibold mb-1 text-gray-600">
+                    既存の物品名候補:
+                    </h4>
+                    <div className="space-y-1">
+                    {matchingItemsByName.map((item) => (
+                        <div key={item.item_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                        <span className="truncate mr-2">{item.name}</span>
+                        <button
+                            type="button"
+                            onClick={() => handleSelectSuggestion(item.name)}
+                            className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
+                            title="選択"
+                        >
+                            選択
+                        </button>
+                        </div>
+                    ))}
+                    </div>
+                </div>
+                )}
             </div>
 
             <div>

@@ -392,16 +392,18 @@ export default function LoaningLog() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     画像
                   </th>
+                  {/* ヘッダーを「物品情報」に変更 */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <button
                       onClick={() => handleSort('item_id')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
-                      物品ID
+                      物品情報
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {/* 物品名ヘッダーを1800px以上で表示 */}
+                  <th className="hidden min-[1800px]:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     物品名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -439,10 +441,20 @@ export default function LoaningLog() {
                         />
                       </div>
                     </td>
+                    {/* 物品情報セル */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-mono">{record.item_id || '-'}</div>
+                      {/* 1800px未満での表示 (縦積み) */}
+                      <div className="flex flex-col min-[1800px]:hidden">
+                        <span className="text-sm font-mono">{record.item_id || '-'}</span>
+                        <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
+                      </div>
+                      {/* 1800px以上での表示 (IDのみ) */}
+                      <div className="hidden min-[1800px]:block text-sm font-mono">
+                        {record.item_id || '-'}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    {/* 物品名セル (1800px以上で表示) */}
+                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">{record.item?.name || '不明なアイテム'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

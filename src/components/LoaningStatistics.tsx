@@ -340,16 +340,18 @@ export default function LoaningStatistics() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     画像
                   </th>
+                  {/* ヘッダーを「物品情報」に変更 */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <button
                       onClick={() => handleSort('item_id')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
-                      物品ID
+                      物品情報
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {/* 物品名ヘッダーを1800px以上で表示 */}
+                  <th className="hidden min-[1800px]:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     物品名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -394,10 +396,20 @@ export default function LoaningStatistics() {
                         />
                       </div>
                     </td>
+                    {/* 物品情報セル */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-mono">{stat.item_id}</div>
+                      {/* 1800px未満での表示 (縦積み) */}
+                      <div className="flex flex-col min-[1800px]:hidden">
+                        <span className="text-sm font-mono">{stat.item_id}</span>
+                        <span className="text-xs text-gray-600">{stat.item_name}</span>
+                      </div>
+                      {/* 1800px以上での表示 (IDのみ) */}
+                      <div className="hidden min-[1800px]:block text-sm font-mono">
+                        {stat.item_id}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    {/* 物品名セル (1800px以上で表示) */}
+                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">{stat.item_name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

@@ -685,7 +685,7 @@ export default function LoaningControl() {
                           </div>
                           <button
                             onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white ${
+                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap ${
                               item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
                             }`}
                             disabled={isProcessing}
@@ -773,7 +773,7 @@ export default function LoaningControl() {
                           </div>
                           <button
                             onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white ${
+                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap ${
                               item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
                             }`}
                             disabled={isProcessing}
@@ -806,7 +806,8 @@ export default function LoaningControl() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        <th className="hidden lg:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        {/* 物品名ヘッダーを1800px以上で表示 */}
+                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                       </tr>
                     </thead>
@@ -826,15 +827,18 @@ export default function LoaningControl() {
                                 />
                               </div>
                             </td>
+                            {/* 物品IDと物品名を一つのセルにまとめる */}
                             <td className="px-4 py-2">
                               <div className="flex flex-col">
                                 <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                <span className="text-xs text-gray-600 lg:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                {/* 物品名を1800px未満で表示 */}
+                                <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
                               </div>
                             </td>
-                            <td className="hidden lg:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            {/* 物品名セルを1800px以上で表示 */}
+                            <td className="hidden min-[1800px]:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
                             <td className="px-4 py-2">
-                              <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50">貸出</button>
+                              <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
                             </td>
                           </tr>
                         ))
@@ -860,7 +864,8 @@ export default function LoaningControl() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        <th className="hidden lg:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        {/* 物品名ヘッダーを1800px以上で表示 */}
+                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
                       </tr>
@@ -881,13 +886,16 @@ export default function LoaningControl() {
                                 />
                               </div>
                             </td>
+                            {/* 物品IDと物品名を一つのセルにまとめる */}
                             <td className="px-4 py-2">
                               <div className="flex flex-col">
                                 <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                <span className="text-xs text-gray-600 lg:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                {/* 物品名を1800px未満で表示 */}
+                                <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
                               </div>
                             </td>
-                            <td className="hidden lg:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            {/* 物品名セルを1800px以上で表示 */}
+                            <td className="hidden min-[1800px]:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
                             <td className="px-4 py-2">
                               <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50">返却</button>
                             </td>

@@ -751,8 +751,13 @@ export default function LoaningStatistics() {
                         <th className="sticky left-0 z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
                           画像
                         </th>
-                        <th className="sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px]">
+                        <th className="sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] min-[1800px]:hidden">
                           物品情報
+                        </th>
+                        <th 
+                          className="hidden min-[1800px]:table-cell sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          物品ID
                         </th>
                         <th 
                           className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs"
@@ -804,15 +809,19 @@ export default function LoaningStatistics() {
                                 />
                               </div>
                             </td>
-                            <td className="sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[150px]">
-                              <div className="flex flex-col min-[1800px]:hidden">
+                            <td className="sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[150px] min-[1800px]:hidden">
+                              <div className="flex flex-col">
                                 <div className="flex items-baseline">
                                   <div className="text-sm font-mono">{displayItemId}</div>
                                   {fractionDisplay}
                                 </div>
                                 <span className="text-xs text-gray-600">{stat.item_name}</span>
                               </div>
-                              <div className="hidden min-[1800px]:flex items-baseline">
+                            </td>
+                            <td 
+                              className="hidden min-[1800px]:table-cell sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap"
+                            >
+                              <div className="flex items-baseline">
                                 <div className="text-sm font-mono">{displayItemId}</div>
                                 {fractionDisplay}
                               </div>

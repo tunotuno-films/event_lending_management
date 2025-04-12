@@ -805,8 +805,8 @@ export default function LoaningControl() {
                     <thead>
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品ID</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
+                        <th className="hidden lg:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                       </tr>
                     </thead>
@@ -826,8 +826,13 @@ export default function LoaningControl() {
                                 />
                               </div>
                             </td>
-                            <td className="px-4 py-2"><span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span></td>
-                            <td className="px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            <td className="px-4 py-2">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                <span className="text-xs text-gray-600 lg:hidden">{control.items?.name ?? '不明な物品'}</span>
+                              </div>
+                            </td>
+                            <td className="hidden lg:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
                             <td className="px-4 py-2">
                               <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50">貸出</button>
                             </td>
@@ -854,8 +859,8 @@ export default function LoaningControl() {
                     <thead>
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品ID</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
+                        <th className="hidden lg:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
                       </tr>
@@ -876,8 +881,13 @@ export default function LoaningControl() {
                                 />
                               </div>
                             </td>
-                            <td className="px-4 py-2"><span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span></td>
-                            <td className="px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            <td className="px-4 py-2">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                <span className="text-xs text-gray-600 lg:hidden">{control.items?.name ?? '不明な物品'}</span>
+                              </div>
+                            </td>
+                            <td className="hidden lg:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
                             <td className="px-4 py-2">
                               <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50">返却</button>
                             </td>

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
-import { AlertCircle, X, Download } from 'lucide-react';
+import { AlertCircle, X, Download, Clock } from 'lucide-react';
 
-// ★ デフォルト画像URLを追加
 const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Event {
@@ -69,7 +68,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
-// ★ 画像URLヘルパー関数を追加
 const getItemImageUrl = (imageUrl: string | null | undefined): string => {
   if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
   try {
@@ -90,9 +88,9 @@ export default function LoaningLog() {
     type: 'success'
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof LoanRecord | 'item_info';
+    key: keyof LoanRecord | 'item_info' | 'loan_period' | 'duration';
     direction: 'asc' | 'desc';
-  } | null>(null);
+  } | null>({ key: 'start_datetime', direction: 'desc' });
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
 
   useEffect(() => {
@@ -203,7 +201,29 @@ export default function LoaningLog() {
     }
   };
 
-  const handleSort = (column: keyof LoanRecord | 'item_info') => {
+  const formatLoanDuration = (start: string, end: string | null): string => {
+    if (!end) {
+      return '-';
+    }
+    try {
+      const startDate = new Date(start).getTime();
+      const endDate = new Date(end).getTime();
+      const durationInSeconds = Math.max(0, Math.floor((endDate - startDate) / 1000));
+
+      if (durationInSeconds < 60) {
+        return `${durationInSeconds}秒`;
+      } else {
+        const minutes = Math.floor(durationInSeconds / 60);
+        const seconds = durationInSeconds % 60;
+        return `${minutes}分${seconds}秒`;
+      }
+    } catch (e) {
+      console.error("Error calculating duration:", e);
+      return '計算エラー';
+    }
+  };
+
+  const handleSort = (column: keyof LoanRecord | 'item_info' | 'loan_period' | 'duration') => {
     setSortConfig(prevConfig => {
       const isCurrentColumn = prevConfig?.key === column;
       const currentDirection = prevConfig?.direction;
@@ -211,8 +231,15 @@ export default function LoaningLog() {
       if (isWideScreen) {
         if (column === 'item_info') return prevConfig;
 
-        const sortKey = column === 'item' ? 'item' : column;
+        if (column === 'loan_period') {
+          const direction = prevConfig?.key === 'start_datetime' && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: 'start_datetime', direction: direction };
+        } else if (column === 'duration') {
+          const direction = prevConfig?.key === 'duration' && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: 'duration', direction: direction };
+        }
 
+        const sortKey = column === 'item' ? 'item' : column;
         const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
         return { key: sortKey as keyof LoanRecord, direction: direction };
 
@@ -227,6 +254,12 @@ export default function LoaningLog() {
           } else {
             return { key: 'item_id', direction: 'asc' };
           }
+        } else if (column === 'loan_period') {
+          const direction = prevConfig?.key === 'start_datetime' && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: 'start_datetime', direction: direction };
+        } else if (column === 'duration') {
+          const direction = prevConfig?.key === 'duration' && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: 'duration', direction: direction };
         } else {
           const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
           return { key: column, direction: direction };
@@ -241,6 +274,25 @@ export default function LoaningLog() {
     const sortKey = sortConfig.key;
 
     return [...loanRecords].sort((a, b) => {
+      if (sortKey === 'duration') {
+        const getDuration = (record: LoanRecord): number => {
+          if (!record.end_datetime) return -1;
+          try {
+            return (new Date(record.end_datetime).getTime() - new Date(record.start_datetime).getTime()) / 1000;
+          } catch {
+            return -2;
+          }
+        };
+        const aDur = getDuration(a);
+        const bDur = getDuration(b);
+
+        if (aDur < 0 && bDur < 0) return 0;
+        if (aDur < 0) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (bDur < 0) return sortConfig.direction === 'asc' ? 1 : -1;
+
+        return sortConfig.direction === 'asc' ? aDur - bDur : bDur - aDur;
+      }
+
       let aVal: any;
       let bVal: any;
 
@@ -248,8 +300,8 @@ export default function LoaningLog() {
         aVal = a.item?.name || '';
         bVal = b.item?.name || '';
       } else if (sortKey === 'item_id') {
-         aVal = a.item_id || '';
-         bVal = b.item_id || '';
+        aVal = a.item_id || '';
+        bVal = b.item_id || '';
       } else {
         aVal = a[sortKey as keyof LoanRecord] || '';
         bVal = b[sortKey as keyof LoanRecord] || '';
@@ -260,12 +312,12 @@ export default function LoaningLog() {
         const bDate = bVal ? new Date(bVal).getTime() : (sortConfig.direction === 'asc' ? Infinity : -Infinity);
         return aDate - bDate;
       } else if (sortKey === 'item_id') {
-         const numA = parseInt(aVal, 10);
-         const numB = parseInt(bVal, 10);
-         if (!isNaN(numA) && !isNaN(numB)) {
+        const numA = parseInt(aVal, 10);
+        const numB = parseInt(bVal, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-         }
-         return sortConfig.direction === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
+        }
+        return sortConfig.direction === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
       } else if (typeof aVal === 'string' && typeof bVal === 'string') {
         return sortConfig.direction === 'asc'
           ? aVal.localeCompare(bVal)
@@ -278,20 +330,29 @@ export default function LoaningLog() {
     });
   }, [loanRecords, sortConfig]);
 
-  const getSortIndicator = (targetKey: keyof LoanRecord | 'item_info') => {
+  const getSortIndicator = (targetKey: keyof LoanRecord | 'item_info' | 'loan_period' | 'duration') => {
     if (!sortConfig) return null;
 
     let isActive = false;
     let direction = sortConfig.direction;
     let displayKey: string = '';
+    const isLoanPeriodTarget = targetKey === 'loan_period';
+    const isDurationTarget = targetKey === 'duration';
+    const activeSortKey = isLoanPeriodTarget ? 'start_datetime' : isDurationTarget ? 'duration' : targetKey;
 
     if (isWideScreen) {
-      isActive = sortConfig.key === targetKey;
+      isActive = sortConfig.key === activeSortKey;
       displayKey = '';
     } else {
       if (targetKey === 'item_info') {
         isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item';
         displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'item' ? '物品名' : '';
+      } else if (isLoanPeriodTarget) {
+        isActive = sortConfig.key === 'start_datetime';
+        displayKey = '';
+      } else if (isDurationTarget) {
+        isActive = sortConfig.key === 'duration';
+        displayKey = '';
       } else {
         isActive = sortConfig.key === targetKey;
         displayKey = '';
@@ -304,15 +365,23 @@ export default function LoaningLog() {
     return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
   };
 
-  const getSortBgColor = (targetKey: keyof LoanRecord | 'item_info') => {
+  const getSortBgColor = (targetKey: keyof LoanRecord | 'item_info' | 'loan_period' | 'duration') => {
     if (!sortConfig) return '';
 
     let isActive = false;
+    const isLoanPeriodTarget = targetKey === 'loan_period';
+    const isDurationTarget = targetKey === 'duration';
+    const activeSortKey = isLoanPeriodTarget ? 'start_datetime' : isDurationTarget ? 'duration' : targetKey;
+
     if (isWideScreen) {
-       isActive = sortConfig.key === targetKey;
+      isActive = sortConfig.key === activeSortKey;
     } else {
       if (targetKey === 'item_info') {
         isActive = sortConfig.key === 'item_id' || sortConfig.key === 'item';
+      } else if (isLoanPeriodTarget) {
+        isActive = sortConfig.key === 'start_datetime';
+      } else if (isDurationTarget) {
+        isActive = sortConfig.key === 'duration';
       } else {
         isActive = sortConfig.key === targetKey;
       }
@@ -385,13 +454,14 @@ export default function LoaningLog() {
     const headers = ['物品ID', '物品名', '貸出時間', '返却時間', '貸出時間(秒)'];
     const csvData = loanRecords.map(record => {
       let durationInSeconds = '-';
-      
+
       if (record.start_datetime && record.end_datetime) {
         const start = new Date(record.start_datetime).getTime();
         const end = new Date(record.end_datetime).getTime();
-        durationInSeconds = ((end - start) / 1000).toFixed(0);
+        const durationSec = Math.max(0, (end - start) / 1000);
+        durationInSeconds = durationSec.toFixed(0);
       }
-      
+
       return [
         record.item_id,
         record.item?.name || '不明なアイテム',
@@ -425,6 +495,17 @@ export default function LoaningLog() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
+  };
+
+  const formatTimeOnly = (dateTimeString: string | null): string => {
+    if (!dateTimeString) return '-';
+    try {
+      const formatted = formatJSTDateTime(dateTimeString);
+      const timePart = formatted.split(' ')[1];
+      return timePart || '-';
+    } catch (e) {
+      return 'エラー';
+    }
   };
 
   return (
@@ -505,80 +586,86 @@ export default function LoaningLog() {
                     onClick={() => isWideScreen && handleSort('item_id')}
                     className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
                   >
-                     <button className="flex items-center gap-1 hover:text-gray-700">
-                       物品ID {getSortIndicator('item_id')}
-                     </button>
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      物品ID {getSortIndicator('item_id')}
+                    </button>
                   </th>
                   <th
                     onClick={() => isWideScreen && handleSort('item')}
                     className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('item')}`}
                   >
-                     <button className="flex items-center gap-1 hover:text-gray-700">
-                       物品名 {getSortIndicator('item')}
-                     </button>
+                    <button className="flex items-center gap-1 hover:text-gray-700">
+                      物品名 {getSortIndicator('item')}
+                    </button>
                   </th>
-                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('start_datetime')}`}>
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('loan_period')}`}>
                     <button
-                      onClick={() => handleSort('start_datetime')}
+                      onClick={() => handleSort('loan_period')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
                       貸出時間
-                      {getSortIndicator('start_datetime')}
+                      {getSortIndicator('loan_period')}
                     </button>
                   </th>
-                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('end_datetime')}`}>
+                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('duration')}`}>
                     <button
-                      onClick={() => handleSort('end_datetime')}
+                      onClick={() => handleSort('duration')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
-                      返却時間
-                      {getSortIndicator('end_datetime')}
+                      <Clock size={14} className="mr-1" />
+                      貸出期間
+                      {getSortIndicator('duration')}
                     </button>
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedLoanRecords.map((record) => (
-                  <tr key={record.result_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
-                        <img
-                          src={getItemImageUrl(record.item?.image)}
-                          alt={record.item?.name || 'アイテム画像'}
-                          className="max-h-full max-w-full object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 min-[1800px]:hidden">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-mono">{record.item_id || '-'}</span>
-                        <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
-                      </div>
-                    </td>
-                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                       <div className="text-sm font-mono">
-                        {record.item_id || '-'}
-                      </div>
-                    </td>
-                    <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
-                      <div className="text-sm truncate" title={record.item?.name || '不明なアイテム'}>{record.item?.name || '不明なアイテム'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="text-sm">
-                        {formatJSTDateTime(record.start_datetime)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="text-sm">
-                        {record.end_datetime
-                          ? formatJSTDateTime(record.end_datetime)
-                          : <span className="text-yellow-500">未返却</span>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedLoanRecords.map((record) => {
+                  const startTimeStr = formatTimeOnly(record.start_datetime);
+                  const endTimeStr = record.end_datetime ? formatTimeOnly(record.end_datetime) : '未返却';
+                  const durationStr = formatLoanDuration(record.start_datetime, record.end_datetime);
+
+                  return (
+                    <tr key={record.result_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
+                          <img
+                            src={getItemImageUrl(record.item?.image)}
+                            alt={record.item?.name || 'アイテム画像'}
+                            className="max-h-full max-w-full object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 min-[1800px]:hidden">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-mono">{record.item_id || '-'}</span>
+                          <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
+                        </div>
+                      </td>
+                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-mono">
+                          {record.item_id || '-'}
+                        </div>
+                      </td>
+                      <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
+                        <div className="text-sm truncate" title={record.item?.name || '不明なアイテム'}>{record.item?.name || '不明なアイテム'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1 text-sm font-mono">
+                          <span className="text-green-600">{startTimeStr}</span>
+                          <span>→</span>
+                          <span className={record.end_datetime ? "text-red-600" : "text-yellow-500 text-xs"}>
+                            {endTimeStr}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">{durationStr}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -50,6 +50,7 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
         if (newCount <= 0) {
           clearInterval(timer);
           if (onClose) onClose();
+          return 0;
         }
         return newCount;
       });
@@ -92,6 +93,7 @@ export default function LoaningControl() {
   const [selectedEventRefId, setSelectedEventRefId] = useState<number | null>(null);
   const [waitingItems, setWaitingItems] = useState<Control[]>([]);
   const [loanedItems, setLoanedItems] = useState<Control[]>([]);
+  const [totalLoanCount, setTotalLoanCount] = useState<number>(0);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isProcessing, setIsProcessing] = useState(false);
@@ -176,10 +178,10 @@ export default function LoaningControl() {
     if (!selectedEventId) return;
 
     setIsLoadingItems(true);
-    console.log(`Fetching items for event: ${selectedEventId}`);
+    console.log(`Fetching items and loan count for event: ${selectedEventId}`);
 
     try {
-      const { data, error } = await supabase
+      const { data: controlData, error: controlError } = await supabase
         .from('control')
         .select(`
           control_id,
@@ -194,12 +196,12 @@ export default function LoaningControl() {
         `)
         .eq('event_id', selectedEventId);
 
-      if (error) {
-        console.error('リレーショナルクエリエラー:', error);
-        throw error;
+      if (controlError) {
+        console.error('Controlデータ取得エラー:', controlError);
+        throw controlError;
       }
 
-      const formattedData = data?.map(item => ({
+      const formattedData = controlData?.map(item => ({
         ...item,
         items: Array.isArray(item.items) ? item.items[0] : item.items,
         created_by: item.created_by || '',
@@ -211,15 +213,28 @@ export default function LoaningControl() {
 
       setWaitingItems(waiting);
       setLoanedItems(loaned);
+
+      const { count, error: countError } = await supabase
+        .from('result')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', selectedEventId);
+
+      if (countError) {
+        console.error('貸出回数取得エラー:', countError);
+      } else {
+        setTotalLoanCount(count ?? 0);
+      }
+
     } catch (error) {
-      console.error('Error fetching items:', error);
+      console.error('Error fetching data:', error);
       setNotification({
         show: true,
-        message: 'アイテム情報の取得に失敗しました',
+        message: 'データの取得に失敗しました',
         type: 'error'
       });
       setWaitingItems([]);
       setLoanedItems([]);
+      setTotalLoanCount(0);
     } finally {
       setIsLoadingItems(false);
     }
@@ -240,6 +255,8 @@ export default function LoaningControl() {
     } else {
       localStorage.removeItem('selectedEventInfo');
     }
+
+    setTotalLoanCount(0);
 
     window.dispatchEvent(new CustomEvent('selectedEventChanged'));
   }, [events, fetchItems]);
@@ -473,6 +490,10 @@ export default function LoaningControl() {
     setBarcodeInput(numericValue);
   };
 
+  const handleCloseNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, show: false }));
+  }, []);
+
   const formatElapsedTime = useCallback((startTime: string | null): string => {
     if (!startTime) return '-';
 
@@ -498,12 +519,19 @@ export default function LoaningControl() {
         <Notification 
           message={notification.message} 
           type={notification.type} 
-          onClose={() => setNotification(prev => ({ ...prev, show: false }))}
+          onClose={handleCloseNotification}
         />
       )}
 
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">貸出・返却管理</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold">貸出・返却管理</h2>
+          {selectedEventId && (
+            <span className="text-xl font-semibold font-mono text-blue-600">
+              総貸出回数: {totalLoanCount}
+            </span>
+          )}
+        </div>
         <div className="mb-6">
           <label htmlFor="loaning-event-select" className="block text-sm font-medium text-gray-700 mb-2">
             イベント選択
@@ -694,9 +722,13 @@ export default function LoaningControl() {
                       {matchingItems.map((item) => {
                         const imageUrl = item.items?.image;
                         const itemName = item.items?.name || '不明な物品';
+                        const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明'; // item_id もフォールバック
+                        const isLoaned = item.status;
+
                         return (
                           <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                             <div className="flex items-center gap-2 overflow-hidden mr-2">
+                              {/* 画像表示 */}
                               <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
                                 {imageUrl && imageUrl.trim() !== '' ? (
                                   <img
@@ -710,7 +742,24 @@ export default function LoaningControl() {
                                   </div>
                                 )}
                               </div>
+                              {/* 物品IDと名前表示を追加 */}
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-xs font-mono text-gray-700 truncate">{itemIdDisplay}</span>
+                                <span className="text-xs text-gray-500 truncate">{itemName}</span>
+                              </div>
                             </div>
+                            {/* 貸出/返却ボタンを追加 */}
+                            <button
+                              onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
+                              disabled={isProcessing}
+                              className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
+                                isLoaned
+                                  ? 'bg-yellow-500 hover:bg-yellow-600'
+                                  : 'bg-blue-500 hover:bg-blue-600'
+                              }`}
+                            >
+                              {isLoaned ? '返却' : '貸出'}
+                            </button>
                           </div>
                         );
                       })}

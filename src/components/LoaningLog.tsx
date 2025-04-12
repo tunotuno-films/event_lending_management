@@ -35,19 +35,26 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
+    // countdown をリセット
+    setCountdown(5);
     const timer = setInterval(() => {
       setCountdown((prev) => {
-        if (prev <= 1) {
+        // newCount を計算
+        const newCount = prev - 1;
+        // 条件を newCount <= 0 に変更
+        if (newCount <= 0) {
           clearInterval(timer);
-          onClose();
+          // onClose が存在する場合のみ呼び出す
+          if (onClose) onClose();
           return 0;
         }
-        return prev - 1;
+        return newCount;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [onClose]);
+    // 依存配列に message を追加
+  }, [message, onClose]);
 
   const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
   const hoverColor = type === 'success' ? 'hover:bg-green-600' : type === 'error' ? 'hover:bg-red-600' : 'hover:bg-blue-600';

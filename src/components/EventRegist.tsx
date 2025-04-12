@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-// CheckCircle アイコンをインポート
-import { AlertCircle, X, CheckCircle } from 'lucide-react';
+// AlertTriangle アイコンをインポート
+import { AlertCircle, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface NotificationProps {
   message: string;
@@ -44,6 +44,12 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   );
 };
 
+// Event インターフェースを定義
+interface Event {
+  event_id: string;
+  name: string;
+}
+
 export default function EventRegist() {
   const [formData, setFormData] = useState({
     eventId: '',
@@ -57,6 +63,10 @@ export default function EventRegist() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 部分一致するイベントID候補を保持する state
+  const [matchingEventsById, setMatchingEventsById] = useState<Event[]>([]);
+  // 部分一致するイベント名候補を保持する state
+  const [matchingEventsByName, setMatchingEventsByName] = useState<Event[]>([]);
 
   const initialEventFormData = {
     eventId: '',
@@ -134,6 +144,79 @@ export default function EventRegist() {
     }
   };
 
+  // イベントID入力時に部分一致検索を実行する useEffect
+  useEffect(() => {
+    const searchExistingEventsById = async () => {
+      if (formData.eventId.trim() === '') {
+        setMatchingEventsById([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('event_id, name')
+          .ilike('event_id', `%${formData.eventId}%`)
+          .eq('event_deleted', false)
+          .limit(5);
+
+        if (error) throw error;
+        setMatchingEventsById(data || []);
+      } catch (error) {
+        console.error('Error searching existing events by ID:', error);
+        setMatchingEventsById([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchExistingEventsById();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [formData.eventId]);
+
+  // イベント名入力時に部分一致検索を実行する useEffect
+  useEffect(() => {
+    const searchExistingEventsByName = async () => {
+      if (formData.name.trim() === '') {
+        setMatchingEventsByName([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('event_id, name')
+          .ilike('name', `%${formData.name}%`)
+          .eq('event_deleted', false)
+          .limit(5);
+
+        if (error) throw error;
+        setMatchingEventsByName(data || []);
+      } catch (error) {
+        console.error('Error searching existing events by name:', error);
+        setMatchingEventsByName([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchExistingEventsByName();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [formData.name]);
+
+  // イベントIDの入力ハンドラを修正 (数字のみ許可)
+  const handleEventIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+    setFormData(prev => ({ ...prev, eventId: numericValue }));
+  };
+
+  // 候補選択処理関数 (イベント名用)
+  const handleSelectEventName = (name: string) => {
+    setFormData(prev => ({ ...prev, name: name }));
+    setMatchingEventsByName([]); // 候補をクリア
+    setNotification({ show: true, message: 'イベント名を入力しました', type: 'success' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -186,12 +269,31 @@ export default function EventRegist() {
           </label>
           <input
             type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={formData.eventId}
-            onChange={(e) => setFormData(prev => ({ ...prev, eventId: e.target.value }))}
-            className="w-full border border-gray-300 rounded-md p-2"
+            onChange={handleEventIdChange}
+            className="w-full border border-gray-300 rounded-md p-2 font-mono"
             maxLength={20}
             required
           />
+          {/* イベントIDの部分一致候補表示 */}
+          {matchingEventsById.length > 0 && (
+            <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+              <h4 className="text-xs font-semibold mb-1 text-orange-600 flex items-center">
+                <AlertTriangle size={14} className="inline mr-1" />
+                既存のイベントID候補:
+              </h4>
+              <div className="space-y-1">
+                {matchingEventsById.map((event) => (
+                  <div key={event.event_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                    {/* 表示形式を "eventId - eventName" に変更 */}
+                    <span className="truncate mr-2 font-mono">{event.event_id} - {event.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         
         <div>
@@ -206,16 +308,38 @@ export default function EventRegist() {
             maxLength={50}
             required
           />
+          {/* イベント名の部分一致候補表示 */}
+          {matchingEventsByName.length > 0 && (
+            <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+              <h4 className="text-xs font-semibold mb-1 text-gray-600">
+                既存のイベント名候補:
+              </h4>
+              <div className="space-y-1">
+                {matchingEventsByName.map((event) => (
+                  <div key={event.event_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                    {/* 表示形式を "eventName" のみに変更 */}
+                    <span className="truncate mr-2">{event.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectEventName(event.name)}
+                      className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
+                      title="選択"
+                    >
+                      選択
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">
           <button
             type="submit"
-            // flex, items-center, gap-2 を追加
             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors flex items-center gap-2"
             disabled={isSubmitting}
           >
-            {/* CheckCircle アイコンを追加 */}
             <CheckCircle size={18} />
             {isSubmitting ? '登録中...' : '登録'}
           </button>

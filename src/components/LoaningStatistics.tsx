@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, ArrowUpDown } from 'lucide-react';
 
-// ★ デフォルト画像URLを追加
 const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Event {
@@ -18,6 +17,7 @@ interface ItemStatistics {
   total_duration: number;
   average_duration: number;
   hourly_usage: number[];
+  original_item_ids?: string[];
 }
 
 interface NotificationProps {
@@ -65,7 +65,6 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   `${i.toString().padStart(2, '0')}:00`
 );
 
-// ★ 画像URLヘルパー関数を追加
 const getItemImageUrl = (imageUrl: string | null | undefined): string => {
   if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
   try {
@@ -86,9 +85,11 @@ export default function LoaningStatistics() {
     type: 'success'
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: 'item_id' | 'loan_count' | 'total_duration' | 'average_duration';
+    key: 'item_id' | 'item_name' | 'loan_count' | 'total_duration' | 'average_duration';
     direction: 'asc' | 'desc';
   } | null>(null);
+  const [mergeByName, setMergeByName] = useState(false);
+  const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
 
   useEffect(() => {
     fetchEvents();
@@ -100,7 +101,6 @@ export default function LoaningStatistics() {
     }
   }, [selectedEventId]);
 
-  // 初回レンダリング時にlocalStorageから読み込み
   useEffect(() => {
     const storedEventId = localStorage.getItem('selectedEventId');
     if (storedEventId) {
@@ -108,9 +108,32 @@ export default function LoaningStatistics() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!mergeByName) {
+      setAnimatedIdIndices({});
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setAnimatedIdIndices(prevIndices => {
+        const newIndices: { [itemName: string]: number } = {};
+        displayStatistics.forEach(stat => {
+          if (stat.original_item_ids && stat.original_item_ids.length > 1) {
+            const currentIndex = prevIndices[stat.item_name] ?? 0;
+            newIndices[stat.item_name] = (currentIndex + 1) % stat.original_item_ids.length;
+          } else if (stat.original_item_ids) {
+            newIndices[stat.item_name] = 0;
+          }
+        });
+        return newIndices;
+      });
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [mergeByName, statistics]);
+
   const fetchEvents = async () => {
     try {
-      // 現在のユーザーIDで絞り込み（RLSが正しく設定されていれば不要ですが、念のため）
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -156,11 +179,18 @@ export default function LoaningStatistics() {
       const itemStats = new Map<string, ItemStatistics>();
 
       loanRecords.forEach(record => {
+        const itemName = record.item?.name;
+        const itemImage = record.item?.image;
+
+        if (!itemName) {
+          console.warn(`Item name not found for item_id: ${record.item_id}`);
+        }
+
         const itemId = record.item_id;
         const existingStats = itemStats.get(itemId) || {
           item_id: itemId,
-          item_name: record.item.name,
-          image: record.item.image,
+          item_name: itemName || '名前不明',
+          image: itemImage || DEFAULT_IMAGE,
           loan_count: 0,
           total_duration: 0,
           average_duration: 0,
@@ -169,19 +199,29 @@ export default function LoaningStatistics() {
 
         existingStats.loan_count++;
 
-        if (record.end_datetime) {
+        if (record.end_datetime && record.start_datetime) {
           const start = new Date(record.start_datetime);
           const end = new Date(record.end_datetime);
-          const duration = (end.getTime() - start.getTime()) / 1000;
-          existingStats.total_duration += duration;
-          existingStats.average_duration = existingStats.total_duration / existingStats.loan_count;
+          if (end.getTime() >= start.getTime()) {
+            const duration = (end.getTime() - start.getTime()) / 1000;
+            existingStats.total_duration += duration;
 
-          // Calculate hourly usage
-          const startHour = start.getHours();
-          existingStats.hourly_usage[startHour]++;
+            const startHour = start.getHours();
+            if (startHour >= 0 && startHour < 24) {
+              existingStats.hourly_usage[startHour]++;
+            }
+          } else {
+            console.warn(`Invalid duration for record: ${record.result_id}. Start: ${record.start_datetime}, End: ${record.end_datetime}`);
+          }
         }
 
         itemStats.set(itemId, existingStats);
+      });
+
+      itemStats.forEach(stats => {
+        if (stats.loan_count > 0) {
+          stats.average_duration = stats.total_duration / stats.loan_count;
+        }
       });
 
       setStatistics(Array.from(itemStats.values()));
@@ -195,30 +235,87 @@ export default function LoaningStatistics() {
     }
   };
 
-  const handleSort = (key: 'item_id' | 'loan_count' | 'total_duration' | 'average_duration') => {
-    let direction: 'asc' | 'desc' = 'asc';
-
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+  const displayStatistics = useMemo(() => {
+    if (!mergeByName) {
+      return statistics;
     }
 
-    setSortConfig({ key, direction });
+    const mergedStats = new Map<string, ItemStatistics>();
 
-    const sortedStats = [...statistics].sort((a, b) => {
-      if (key === 'item_id') {
-        return direction === 'asc'
-          ? a.item_id.localeCompare(b.item_id)
-          : b.item_id.localeCompare(a.item_id);
+    statistics.forEach(stat => {
+      const existing = mergedStats.get(stat.item_name);
+      if (existing) {
+        const newHourlyUsage = existing.hourly_usage.map((count, hour) => count + stat.hourly_usage[hour]);
+        const newOriginalItemIds = [...(existing.original_item_ids || [existing.item_id]), stat.item_id]
+          .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+
+        mergedStats.set(stat.item_name, {
+          ...existing,
+          item_name: stat.item_name,
+          loan_count: existing.loan_count + stat.loan_count,
+          total_duration: existing.total_duration + stat.total_duration,
+          hourly_usage: newHourlyUsage,
+          original_item_ids: newOriginalItemIds,
+        });
       } else {
-        const aValue = a[key];
-        const bValue = b[key];
-        return direction === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
+        mergedStats.set(stat.item_name, {
+          ...stat,
+          original_item_ids: [stat.item_id].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+        });
       }
     });
 
-    setStatistics(sortedStats);
+    mergedStats.forEach(stats => {
+      if (stats.loan_count > 0) {
+        stats.average_duration = stats.total_duration / stats.loan_count;
+      } else {
+        stats.average_duration = 0;
+      }
+    });
+
+    return Array.from(mergedStats.values());
+  }, [statistics, mergeByName]);
+
+  const sortedDisplayStatistics = useMemo(() => {
+    if (!sortConfig) return displayStatistics;
+
+    const sortKey = sortConfig.key;
+
+    return [...displayStatistics].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      if (mergeByName && sortKey === 'item_id') {
+        aValue = a.original_item_ids ? parseInt(a.original_item_ids[0], 10) : 0;
+        bValue = b.original_item_ids ? parseInt(b.original_item_ids[0], 10) : 0;
+      } else {
+        aValue = a[sortKey];
+        bValue = b[sortKey];
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+
+      return 0;
+    });
+  }, [displayStatistics, sortConfig, mergeByName]);
+
+  const handleSort = (key: 'item_id' | 'item_name' | 'loan_count' | 'total_duration' | 'average_duration') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    const currentKey = key;
+
+    if (sortConfig && sortConfig.key === currentKey && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key: currentKey, direction });
   };
 
   const formatDuration = (seconds: number) => {
@@ -230,17 +327,24 @@ export default function LoaningStatistics() {
   };
 
   const downloadCSV = () => {
-    if (statistics.length === 0) return;
+    const dataToExport = sortedDisplayStatistics;
+    if (dataToExport.length === 0) return;
 
     const headers = ['物品ID', '物品名', '貸出回数', '総貸出時間', '平均貸出時間', ...HOURS];
-    const csvData = statistics.map(stat => [
-      stat.item_id,
-      stat.item_name,
-      stat.loan_count.toString(),
-      formatDuration(stat.total_duration),
-      formatDuration(stat.average_duration),
-      ...stat.hourly_usage.map(count => count.toString())
-    ]);
+
+    const csvData = dataToExport.map(stat => {
+      const itemIdToExport = mergeByName
+        ? stat.original_item_ids?.[0] ?? ''
+        : stat.item_id;
+
+      const commonData = [
+        stat.loan_count.toString(),
+        formatDuration(stat.total_duration),
+        formatDuration(stat.average_duration),
+        ...stat.hourly_usage.map(count => count.toString())
+      ];
+      return [itemIdToExport, stat.item_name, ...commonData];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -251,16 +355,16 @@ export default function LoaningStatistics() {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
 
-    // ファイル名を「yyyymmdd_貸出統計_イベントid-イベント名.csv」形式に変更
     const today = new Date();
     const yyyy = today.getFullYear().toString();
     const mm = (today.getMonth() + 1).toString().padStart(2, '0');
     const dd = today.getDate().toString().padStart(2, '0');
     const dateString = `${yyyy}${mm}${dd}`;
     const selectedEvent = events.find(e => e.event_id === selectedEventId);
-    const fileName = selectedEvent 
-      ? `${dateString}_貸出統計_${selectedEvent.event_id}-${selectedEvent.name}.csv`
-      : `${dateString}_貸出統計.csv`;
+    const mergeSuffix = mergeByName ? '_統合' : '';
+    const fileName = selectedEvent
+      ? `${dateString}_貸出統計_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.csv`
+      : `${dateString}_貸出統計${mergeSuffix}.csv`;
     link.download = fileName;
 
     document.body.appendChild(link);
@@ -271,11 +375,10 @@ export default function LoaningStatistics() {
 
   const getHeatmapColor = (count: number, maxCount: number) => {
     if (count === 0) return {
-      backgroundColor: 'rgb(249, 250, 251)', // bg-gray-50
-      color: 'rgb(156, 163, 175)' // text-gray-400
+      backgroundColor: 'rgb(249, 250, 251)',
+      color: 'rgb(156, 163, 175)'
     };
     
-    // Calculate opacity based on count relative to max
     const opacity = Math.max(0.1, Math.min(1, count / maxCount));
     
     return {
@@ -318,6 +421,25 @@ export default function LoaningStatistics() {
             ))}
           </select>
         </div>
+
+        <div className="flex items-center justify-start mb-4">
+          <button
+            type="button"
+            onClick={() => setMergeByName(!mergeByName)}
+            className={`${
+              mergeByName ? 'bg-blue-600' : 'bg-gray-200'
+            } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            role="switch"
+            aria-checked={mergeByName}
+          >
+            <span
+              className={`${
+                mergeByName ? 'translate-x-6' : 'translate-x-1'
+              } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
+            />
+          </button>
+          <span className="ml-2 text-sm font-medium text-gray-700">物品名で統合して表示</span>
+        </div>
       </div>
 
       {selectedEventId && (
@@ -332,7 +454,6 @@ export default function LoaningStatistics() {
             </button>
           </div>
 
-          {/* Regular statistics table */}
           <div className="mb-8 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -340,7 +461,6 @@ export default function LoaningStatistics() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     画像
                   </th>
-                  {/* ヘッダーを「物品情報」に変更 */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <button
                       onClick={() => handleSort('item_id')}
@@ -350,9 +470,14 @@ export default function LoaningStatistics() {
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
-                  {/* 物品名ヘッダーを1800px以上で表示 */}
                   <th className="hidden min-[1800px]:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    物品名
+                    <button
+                      onClick={() => handleSort('item_name')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      物品名
+                      <ArrowUpDown size={14} />
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <button
@@ -384,50 +509,77 @@ export default function LoaningStatistics() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {statistics.map((stat) => (
-                  <tr key={stat.item_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
-                        <img
-                          src={getItemImageUrl(stat.image)}
-                          alt={stat.item_name}
-                          className="max-h-full max-w-full object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                        />
-                      </div>
-                    </td>
-                    {/* 物品情報セル */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {/* 1800px未満での表示 (縦積み) */}
-                      <div className="flex flex-col min-[1800px]:hidden">
-                        <span className="text-sm font-mono">{stat.item_id}</span>
-                        <span className="text-xs text-gray-600">{stat.item_name}</span>
-                      </div>
-                      {/* 1800px以上での表示 (IDのみ) */}
-                      <div className="hidden min-[1800px]:block text-sm font-mono">
-                        {stat.item_id}
-                      </div>
-                    </td>
-                    {/* 物品名セル (1800px以上で表示) */}
-                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{stat.item_name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{stat.loan_count}回</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{formatDuration(stat.total_duration)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{formatDuration(stat.average_duration)}</div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedDisplayStatistics.map((stat) => {
+                  let displayItemId: string | React.ReactNode = stat.item_id;
+                  let fractionDisplay: React.ReactNode = null;
+
+                  if (mergeByName && stat.original_item_ids && stat.original_item_ids.length > 0) {
+                    const currentIdIndex = animatedIdIndices[stat.item_name] ?? 0;
+                    const totalIds = stat.original_item_ids.length;
+                    displayItemId = stat.original_item_ids[currentIdIndex];
+
+                    if (totalIds > 1) {
+                      displayItemId = (
+                        <span key={currentIdIndex} className="animate-fade-in-out">
+                          {displayItemId}
+                        </span>
+                      );
+                      fractionDisplay = (
+                        <span className="ml-1 text-xs text-gray-400">
+                          {currentIdIndex + 1}/{totalIds}
+                        </span>
+                      );
+                    }
+                  }
+
+                  return (
+                    <tr key={mergeByName ? stat.item_name : stat.item_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
+                          <img
+                            src={getItemImageUrl(stat.image)}
+                            alt={stat.item_name}
+                            className="max-h-full max-w-full object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col min-[1800px]:hidden">
+                          <div className="flex items-baseline">
+                            <div className="text-sm font-mono">
+                              {displayItemId}
+                            </div>
+                            {fractionDisplay}
+                          </div>
+                          <span className="text-xs text-gray-600">{stat.item_name}</span>
+                        </div>
+                        <div className="hidden min-[1800px]:flex items-baseline">
+                          <div className="text-sm font-mono">
+                            {displayItemId}
+                          </div>
+                          {fractionDisplay}
+                        </div>
+                      </td>
+                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">{stat.item_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">{stat.loan_count}回</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">{formatDuration(stat.total_duration)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">{formatDuration(stat.average_duration)}</div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Heatmap section */}
           <div className="mt-8">
             <h3 className="text-lg font-semibold mb-4">ヒートマップ</h3>
             <div className="relative">
@@ -440,9 +592,9 @@ export default function LoaningStatistics() {
                           画像
                         </th>
                         <th className="sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px]">
-                          物品ID
+                          物品情報
                         </th>
-                        <th className="sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px]">
+                        <th className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px]">
                           物品名
                         </th>
                         {HOURS.map(hour => (
@@ -453,11 +605,33 @@ export default function LoaningStatistics() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {statistics.map((stat) => {
-                        const maxCount = Math.max(...stat.hourly_usage);
-                        
+                      {sortedDisplayStatistics.map((stat) => {
+                        const maxCount = Math.max(...stat.hourly_usage, 1);
+
+                        let displayItemId: string | React.ReactNode = stat.item_id;
+                        let fractionDisplay: React.ReactNode = null;
+
+                        if (mergeByName && stat.original_item_ids && stat.original_item_ids.length > 0) {
+                          const currentIdIndex = animatedIdIndices[stat.item_name] ?? 0;
+                          const totalIds = stat.original_item_ids.length;
+                          displayItemId = stat.original_item_ids[currentIdIndex];
+
+                          if (totalIds > 1) {
+                            displayItemId = (
+                              <span key={currentIdIndex} className="animate-fade-in-out">
+                                {displayItemId}
+                              </span>
+                            );
+                            fractionDisplay = (
+                              <span className="ml-1 text-xs text-gray-400">
+                                {currentIdIndex + 1}/{totalIds}
+                              </span>
+                            );
+                          }
+                        }
+
                         return (
-                          <tr key={`heatmap-${stat.item_id}`} className="hover:bg-gray-50">
+                          <tr key={`heatmap-${mergeByName ? stat.item_name : stat.item_id}`} className="hover:bg-gray-50">
                             <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
                               <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
                                 <img
@@ -469,14 +643,24 @@ export default function LoaningStatistics() {
                               </div>
                             </td>
                             <td className="sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[150px]">
-                              <div className="text-sm font-mono">{stat.item_id}</div>
+                              <div className="flex flex-col min-[1800px]:hidden">
+                                <div className="flex items-baseline">
+                                  <div className="text-sm font-mono">{displayItemId}</div>
+                                  {fractionDisplay}
+                                </div>
+                                <span className="text-xs text-gray-600">{stat.item_name}</span>
+                              </div>
+                              <div className="hidden min-[1800px]:flex items-baseline">
+                                <div className="text-sm font-mono">{displayItemId}</div>
+                                {fractionDisplay}
+                              </div>
                             </td>
-                            <td className="sticky left-[250px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[200px]">
+                            <td className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[200px]">
                               <div className="text-sm">{stat.item_name}</div>
                             </td>
                             {stat.hourly_usage.map((count, index) => (
-                              <td key={`${stat.item_id}-${index}`} className="px-2 py-4 text-center w-[50px] min-w-[50px]">
-                                <div 
+                              <td key={`heatmap-cell-${mergeByName ? stat.item_name : stat.item_id}-${index}`} className="px-2 py-4 text-center w-[50px] min-w-[50px]">
+                                <div
                                   className="w-8 h-8 rounded flex items-center justify-center mx-auto"
                                   style={getHeatmapColor(count, maxCount)}
                                 >

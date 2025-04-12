@@ -598,17 +598,19 @@ export default function ItemList() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 画像
               </th>
+              {/* ★ ヘッダーを「物品情報」に変更 */}
               <th
                 onClick={() => handleSort('item_id')}
                 className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='item_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
               >
-                物品ID {sortColumn==='item_id' && (
+                物品情報 {sortColumn==='item_id' && (
                   <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
                 )}
               </th>
+              {/* ★ 物品名ヘッダーを1800px以上で表示 */}
               <th
                 onClick={() => handleSort('name')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
               >
                 物品名 {sortColumn==='name' && (
                   <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
@@ -659,10 +661,20 @@ export default function ItemList() {
                     />
                   </div>
                 </td>
+                {/* ★ 物品情報セル */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
+                  {/* 1800px未満での表示 (縦積み) */}
+                  <div className="flex flex-col min-[1800px]:hidden">
+                    <span className="text-sm font-mono">{item.item_id}</span>
+                    <span className="text-xs text-gray-600">{item.name}</span>
+                  </div>
+                  {/* 1800px以上での表示 (IDのみ) */}
+                  <div className="hidden min-[1800px]:block text-sm font-mono">
+                    {item.item_id}
+                  </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                {/* ★ 物品名セル (1800px以上で表示) */}
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{item.name}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

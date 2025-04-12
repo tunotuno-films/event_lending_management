@@ -660,7 +660,7 @@ export default function LoaningControl() {
                       }
                     }}
                     placeholder="アイテムIDを入力"
-                    className="w-full border border-gray-300 rounded-md p-2"
+                    className="w-full border border-gray-300 rounded-md p-2 font-mono"
                     autoFocus
                   />
                 </div>
@@ -669,7 +669,7 @@ export default function LoaningControl() {
                     <button
                       key={num}
                       onClick={() => handleNumericInput(barcodeInput + num)}
-                      className="p-4 text-xl font-semibold bg-gray-100 hover:bg-gray-200 rounded-md"
+                      className="p-4 text-xl font-semibold font-mono bg-gray-100 hover:bg-gray-200 rounded-md"
                     >
                       {num}
                     </button>
@@ -725,10 +725,13 @@ export default function LoaningControl() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-lg font-semibold">待機中のアイテム ({waitingItems.length})</h3>
-                {isLoadingItems && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                )}
+                <h3 className="text-lg font-semibold">待機中のアイテム</h3>
+                <div className="flex items-center gap-2">
+                  {isLoadingItems && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  )}
+                  <span className="text-lg font-semibold font-mono">{waitingItems.length}</span>
+                </div>
               </div>
               <div className="p-4">
                 <div className="overflow-x-auto max-h-96 overflow-y-auto">
@@ -789,10 +792,13 @@ export default function LoaningControl() {
 
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-lg font-semibold">貸出中のアイテム ({loanedItems.length})</h3>
-                {isLoadingItems && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                )}
+                <h3 className="text-lg font-semibold">貸出中のアイテム</h3>
+                <div className="flex items-center gap-2">
+                  {isLoadingItems && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  )}
+                  <span className="text-lg font-semibold font-mono">{loanedItems.length}</span>
+                </div>
               </div>
               <div className="p-4">
                 <div className="overflow-x-auto max-h-96 overflow-y-auto">

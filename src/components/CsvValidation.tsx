@@ -100,6 +100,9 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
       }
       console.log('Current User ID for validation:', userId);
 
+      // ★ CSVファイル内の item_id 重複チェック用 Set
+      const csvItemIds = new Set<string>();
+
       // 各行のバリデーションを並列実行
       const validatedItemsPromises = csvData.map(async (item, index) => {
         const errors: string[] = [];
@@ -109,6 +112,13 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
           errors.push('物品IDは必須です');
         } else if (!/^\d{8}$|^\d{13}$/.test(item.item_id)) {
           errors.push('物品IDは8桁または13桁の数字形式です');
+        } else {
+          // ★ CSVファイル内での重複チェック
+          if (csvItemIds.has(item.item_id)) {
+            errors.push('物品IDがCSVファイル内で重複しています');
+          } else {
+            csvItemIds.add(item.item_id); // 重複がなければSetに追加
+          }
         }
 
         if (!item.name) errors.push('物品名は必須です');
@@ -119,7 +129,7 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
         // 画像(image)は任意なのでチェック不要
 
         // --- 非同期的なバリデーション (重複チェック) の条件も修正 ---
-        if (item.item_id && /^\d{8}$|^\d{13}$/.test(item.item_id)) {
+        if (item.item_id && /^\d{8}$|^\d{13}$/.test(item.item_id) && !errors.some(e => e.includes('重複'))) { // ★ CSV内重複がない場合のみDBチェック
           try {
               // registered_by と item_id の組み合わせで既存データを検索
               const { data: existingItem, error: dbError } = await supabase
@@ -132,14 +142,14 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
 
               if (dbError) {
                 console.error(`DB Error checking duplicate for item ${index} (item_id: ${item.item_id}):`, dbError);
-                errors.push(`重複チェックエラー: ${dbError.message}`);
+                errors.push(`DB重複チェックエラー: ${dbError.message}`); // エラーメッセージ修正
               } else if (existingItem) {
                 console.log(`Duplicate found for item ${index} (item_id: ${item.item_id})`);
                 errors.push('この物品IDは既にあなたが登録済みです');
               }
           } catch (dupError) {
               console.error(`Error during duplicate check for item ${index}:`, dupError);
-              errors.push('重複チェック中に予期せぬエラーが発生しました');
+              errors.push('DB重複チェック中に予期せぬエラーが発生しました'); // エラーメッセージ修正
           }
         }
 

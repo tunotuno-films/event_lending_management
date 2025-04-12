@@ -1,7 +1,7 @@
-    import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
     import { useNavigate } from 'react-router-dom';
     import { supabase, insertWithOwnerId } from '../lib/supabase';
-    import { Barcode, StopCircle, X, AlertTriangle, Download, Upload, CheckCircle } from 'lucide-react';
+    import { Barcode, StopCircle, X, AlertTriangle, Download, Upload, CheckCircle, Package } from 'lucide-react';
     import Notification from './Notification';
     import { useZxing } from 'react-zxing';
     import BulkUploadModal from './BulkUploadModal';
@@ -53,7 +53,6 @@
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [pendingSubmission, setPendingSubmission] = useState(false);
 
-    // バーコードスキャナーの設定 - エラーハンドリングを追加
     const { ref } = useZxing({
         onDecodeResult(result) {
         setFormData(prev => ({ ...prev, barcode: result.getText() }));
@@ -71,12 +70,11 @@
         },
         constraints: {
         video: {
-            facingMode: 'environment'  // 背面カメラを優先使用
+            facingMode: 'environment'
         }
         }
     });
 
-    // スキャン開始時にエラー状態をリセット
     const startScanning = () => {
         setScannerError(false);
         setIsScanning(true);
@@ -86,40 +84,31 @@
         fetchExistingData();
     }, []);
 
-    // useEffectの部分を修正
     useEffect(() => {
-        // ページリロード検出用のフラグをチェック
         const wasReloaded = sessionStorage.getItem('pageWasReloaded');
-        
-        // 認証済みで、保留中のデータがある場合
+
         if (isAuthenticated && pendingSubmission) {
-        // 保留中のフォーム送信を実行
         const processPendingSubmission = async () => {
             await handleRegisterItem();
-            // 処理後にフラグをリセット
             setPendingSubmission(false);
         };
-        
+
         processPendingSubmission();
         }
-        
-        // コンポーネントマウント時に保存データがあれば復元
+
         const savedFormData = sessionStorage.getItem('pendingRegistrationData');
         const hasPendingData = sessionStorage.getItem('hasPendingRegistration');
-        
-        // リロードされた場合でペンディングデータがなければフォームをリセット
+
         if (wasReloaded === 'true' && (!savedFormData || !hasPendingData)) {
         resetForm();
         sessionStorage.removeItem('pageWasReloaded');
         return;
         }
-        
-        // リロードされた場合でペンディングデータがある場合は処理を続ける
+
         if (wasReloaded === 'true') {
         sessionStorage.removeItem('pageWasReloaded');
         }
-        
-        // ログイン前の入力データがあれば復元（既存の機能）
+
         if (savedFormData && hasPendingData === 'true') {
         try {
             const parsedData = JSON.parse(savedFormData);
@@ -131,10 +120,8 @@
             customGenre: parsedData.customGenre || '',
             manager: parsedData.manager || '',
             customManager: parsedData.customManager || ''
-            // 画像は復元できないのでnullのままにする
             }));
-            
-            // 画像以外のデータが復元された場合に通知
+
             if (parsedData.itemName) {
             setNotification({
                 show: true,
@@ -142,8 +129,7 @@
                 type: 'success'
             });
             }
-            
-            // ログイン済みで保留中データがある場合はフラグをセット
+
             if (isAuthenticated) {
             setPendingSubmission(true);
             }
@@ -151,25 +137,20 @@
             console.error('Failed to parse saved form data:', e);
         }
         }
-    }, [isAuthenticated]); // isAuthenticatedの変更でチェック
+    }, [isAuthenticated]);
 
-    // ページリロード検出用のイベントリスナーを追加
     useEffect(() => {
-        // ページ読み込み完了時にフラグをセット
         const handleLoad = () => {
         sessionStorage.setItem('pageWasReloaded', 'false');
         };
-        
-        // ページリロード前にフラグをセット
+
         const handleBeforeUnload = () => {
         sessionStorage.setItem('pageWasReloaded', 'true');
         };
-        
-        // イベントリスナーの登録
+
         window.addEventListener('load', handleLoad);
         window.addEventListener('beforeunload', handleBeforeUnload);
-        
-        // クリーンアップ
+
         return () => {
         window.removeEventListener('load', handleLoad);
         window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -198,8 +179,7 @@
         if (e.target.files && e.target.files[0]) {
         const selectedFile = e.target.files[0];
         setFormData(prev => ({ ...prev, image: selectedFile }));
-        
-        // 画像プレビューを作成
+
         const reader = new FileReader();
         reader.onload = (event) => {
             setImagePreview(event.target?.result as string);
@@ -208,7 +188,6 @@
         }
     };
 
-    // リセット時にプレビューもクリア
     const resetForm = () => {
         setFormData({
         barcode: '',
@@ -224,7 +203,6 @@
         sessionStorage.removeItem('hasPendingRegistration');
     };
 
-    // ログインを促す関数
     const promptLogin = (message: string) => {
         if (setAuthModalMode && setIsAuthModalOpen) {
         alert(message);
@@ -234,17 +212,7 @@
     };
 
     const handleRegisterItem = async () => {
-        if (!formData.image) {
-        setNotification({
-            show: true,
-            message: '画像を選択してください',
-            type: 'error'
-        });
-        return false;
-        }
-
         try {
-        // バーコードの重複チェック
         if (formData.barcode) {
             const { data: existingItem } = await supabase
             .from('items')
@@ -263,28 +231,31 @@
             }
         }
 
-        // 画像アップロード処理
-        const file = formData.image;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        let publicUrl: string | null = null;
 
-        const { error: uploadError } = await supabase.storage
+        if (formData.image) {
+            const file = formData.image;
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
             .from('items')
             .upload(filePath, file);
 
-        if (uploadError) {
+            if (uploadError) {
             throw uploadError;
-        }
+            }
 
-        const { data: { publicUrl } } = supabase.storage
+            const { data: urlData } = supabase.storage
             .from('items')
             .getPublicUrl(filePath);
+            publicUrl = urlData?.publicUrl || null;
+        }
 
         const finalGenre = formData.genre === 'その他' ? formData.customGenre : formData.genre;
         const finalManager = formData.manager === 'その他' ? formData.customManager : formData.manager;
 
-        // 新しい関数を使用して登録
         const { error: insertError } = await insertWithOwnerId(
             'items',
             {
@@ -308,13 +279,11 @@
             type: 'success'
         });
 
-        // 保存済みデータを削除
         sessionStorage.removeItem('pendingRegistrationData');
         sessionStorage.removeItem('hasPendingRegistration');
 
-        // フォームとプレビューをリセット
         resetForm();
-        
+
         return true;
         } catch (error) {
         console.error('Error submitting form:', error);
@@ -327,13 +296,10 @@
         }
     };
 
-    // 登録処理
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 非ログイン状態ではデータを保存してログインモーダルを表示
         if (!isAuthenticated) {
-        // 画像以外のデータをセッションストレージに保存
         const dataToSave = {
             barcode: formData.barcode,
             itemName: formData.itemName,
@@ -342,27 +308,24 @@
             manager: formData.manager,
             customManager: formData.customManager
         };
-        
+
         sessionStorage.setItem('pendingRegistrationData', JSON.stringify(dataToSave));
         sessionStorage.setItem('hasPendingRegistration', 'true');
-        
-        // ユーザーに通知
+
         setNotification({
             show: true,
             message: 'ログイン後に登録を完了します。画像は再度選択する必要があります。',
             type: 'success'
         });
-        
-        // ログインモーダルを表示
+
         if (setAuthModalMode && setIsAuthModalOpen) {
             setAuthModalMode('signin');
             setIsAuthModalOpen(true);
         }
-        
+
         return;
         }
 
-        // ログイン済みの場合は通常の登録処理
         await handleRegisterItem();
     };
 
@@ -378,9 +341,8 @@
             const text = e.target?.result as string;
             const rows = text.split('\n');
 
-            // Filter out empty rows and parse CSV
             const items = rows
-            .filter(row => row.trim()) // Skip empty rows
+            .filter(row => row.trim())
             .map(row => {
                 const [item_id, name, genre, manager] = row.split(',').map(field => field.trim());
                 return {
@@ -393,7 +355,6 @@
                 };
             });
 
-            // Remove header row if it exists
             if (items.length > 0 && items[0].item_id === 'item_id') {
             items.shift();
             }
@@ -426,9 +387,7 @@
         document.body.removeChild(link);
     };
 
-    // 手動でバーコードを入力する - 数字のみの入力に制限
     const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // 数字以外の文字を取り除く
         const numericValue = e.target.value.replace(/[^0-9]/g, '');
         setFormData(prev => ({ ...prev, barcode: numericValue }));
     };
@@ -443,8 +402,7 @@
             />
         )}
 
-        {/* 白い背景の範囲を限定するよう修正 */}
-        <div className="bg-white w-full p-6"> {/* min-h-screen を削除 */}
+        <div className="bg-white w-full p-6">
             <h2 className="text-xl font-semibold mb-6">物品登録</h2>
 
             <div className="mb-6 border p-4 rounded-md">
@@ -452,7 +410,6 @@
                 バーコード
             </label>
             <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
-                {/* ボタンを左側に移動 */}
                 <button
                 type="button"
                 onClick={() => isScanning ? setIsScanning(false) : startScanning()}
@@ -475,27 +432,24 @@
                     </>
                 )}
                 </button>
-                
-                {/* 入力フィールドを右側に移動 - 数字のみの入力に制限 */}
+
                 <div className="w-full order-1 sm:order-2 relative">
                 <input
                     type="text"
-                    inputMode="numeric" // モバイルで数字キーボードを表示
-                    pattern="[0-9]*" // 数字のみ許可
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.barcode}
                     onChange={handleBarcodeInput}
-                    className="w-full border border-gray-300 rounded-md p-2 flex-grow"
+                    className="w-full border border-gray-300 rounded-md p-2 flex-grow font-mono"
                     placeholder="スキャンするか手動で入力"
                     aria-label="バーコード入力"
                 />
-                {/* 桁数カウンターを右下に表示 */}
                 <div className="absolute bottom-1 right-2 text-xs text-gray-500">
                     {formData.barcode.length}
                 </div>
                 </div>
             </div>
 
-            {/* スキャナー表示エリア - 左寄せに変更 */}
             {isScanning && (
                 <div className="relative w-full max-w-md aspect-video mb-4 rounded-lg overflow-hidden border-2 border-blue-500">
                 {scannerError ? (
@@ -518,44 +472,60 @@
             <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label htmlFor="image-upload" className="block text-sm font-medium text-gray-700 mb-1">
-                画像 <span className="text-red-500">*必須</span>
+                画像
                 </label>
                 
-                <div className="mb-2">
-                <input
-                    id="image-upload"
-                    type="file"
-                    accept="image/jpeg, image/png, image/gif, image/webp"
-                    onChange={handleImageChange}
-                    className="w-full border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                    required
-                />
-                </div>
-                
-                {/* 画像プレビュー表示 - アスペクト比を維持するように修正 */}
-                {imagePreview && (
-                <div className="mt-2 relative inline-block">
-                    <div className="relative bg-gray-100 border rounded-md p-2" style={{ maxWidth: '250px' }}>
-                    <img 
-                        src={imagePreview} 
-                        alt="画像プレビュー" 
-                        className="max-h-48 object-contain" // object-cover から object-contain に変更
-                        style={{ maxWidth: '100%', display: 'block' }} // 幅を親要素に合わせつつ、高さは自動調整
-                    />
+                {/* Flex container for preview and input */}
+                <div className="flex items-center gap-4">
+                    {/* Image preview container */}
+                    <div className="relative inline-block"> {/* mt-2 を削除 */}
+                        {/* スタイルを物品編集モーダルと統一 */}
+                        <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                        {imagePreview ? (
+                            <img 
+                                src={imagePreview} 
+                                alt="画像プレビュー" 
+                                className="max-h-full max-w-full object-contain" 
+                            />
+                        ) : (
+                            // 画像がない場合のプレースホルダー
+                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                <Package className="h-10 w-10 text-gray-400" />
+                            </div>
+                        )}
+                        </div>
+                        {/* 画像が選択されている場合のみ削除ボタンを表示 */}
+                        {imagePreview && (
+                            <button
+                            type="button"
+                            onClick={() => {
+                                setImagePreview(null);
+                                setFormData(prev => ({ ...prev, image: null }));
+                                // ファイル入力もリセットする場合
+                                const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+                                if (fileInput) {
+                                    fileInput.value = '';
+                                }
+                            }}
+                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100 border"
+                            aria-label="プレビューを削除"
+                            >
+                            <X size={16} className="text-gray-600" />
+                            </button>
+                        )}
                     </div>
-                    <button
-                    type="button"
-                    onClick={() => {
-                        setImagePreview(null);
-                        setFormData(prev => ({ ...prev, image: null }));
-                    }}
-                    className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100"
-                    aria-label="プレビューを削除"
-                    >
-                    <X size={16} className="text-gray-600" />
-                    </button>
+
+                    {/* File input container */}
+                    <div className="flex-1"> {/* mb-2 を削除し、flex-1 を追加 */}
+                        <input
+                            id="image-upload"
+                            type="file"
+                            accept="image/jpeg, image/png, image/gif, image/webp"
+                            onChange={handleImageChange}
+                            className="w-full border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                        />
+                    </div>
                 </div>
-                )}
             </div>
 
             <div>
@@ -630,7 +600,6 @@
                 )}
             </div>
 
-            {/* フォーム送信ボタン部分 */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center">
                 {isAuthenticated ? (
                 <button
@@ -638,7 +607,7 @@
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
                 >
                     <CheckCircle size={20} className="mr-2" />
-                    <span>登録する</span>
+                    <span>登録</span>
                 </button>
                 ) : (
                 <button
@@ -656,25 +625,24 @@
                 </button>
                 )}
                 
-                {/* バルクアップロードボタン（認証済みユーザーのみ表示） */}
                 {isAuthenticated && (
                 <>
-                <button
+                    <button
                     type="button"
                     onClick={() => setShowBulkUploadModal(true)}
                     className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
-                >
+                    >
                     <Upload size={20} className="mr-2" />
                     <span>CSVから一括登録</span>
-                </button>
-                <button
+                    </button>
+                    <button
                     type="button"
                     onClick={downloadCsvTemplate}
                     className="w-full sm:w-auto ml-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center"
-                >
+                    >
                     <Download size={20} className="mr-2" />
                     <span>CSVテンプレート</span>
-                </button>
+                    </button>
                 </>
                 )}
             </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, X, AlertCircle, Undo2, Download, Package } from 'lucide-react';
+import { Pencil, Trash2, X, AlertCircle, Undo2, Download, Package, Save } from 'lucide-react';
 
 interface Item {
   item_id: string;
@@ -162,8 +162,9 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+    const fileInput = e.target;
+    if (fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
       setFormData(prev => ({ ...prev, image: file }));
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -173,6 +174,15 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     } else {
       setFormData(prev => ({ ...prev, image: null }));
       setPreviewUrl(item.image);
+    }
+  };
+
+  const handleRemovePreview = () => {
+    setPreviewUrl(item.image);
+    setFormData(prev => ({ ...prev, image: null }));
+    const fileInput = document.getElementById(`edit-image-upload-${item.item_id}`) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
@@ -194,7 +204,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             <input
               type="text"
               value={item.item_id}
-              className="w-full border border-gray-300 rounded-md p-2 bg-gray-100"
+              className="w-full border border-gray-300 rounded-md p-2 bg-gray-100 font-mono"
               disabled
             />
           </div>
@@ -204,24 +214,37 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                {previewUrl && previewUrl.trim() !== '' ? (
-                  <img
-                    src={previewUrl}
-                    alt={item.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                    <Package className="h-10 w-10 text-gray-400" />
-                  </div>
+              <div className="relative inline-block">
+                <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                  {previewUrl && previewUrl.trim() !== '' ? (
+                    <img
+                      src={previewUrl}
+                      alt={item.name}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                      <Package className="h-10 w-10 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+                {(previewUrl !== item.image || formData.image) && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePreview}
+                    className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100 border"
+                    aria-label="画像変更を取り消す"
+                  >
+                    <X size={16} className="text-gray-600" />
+                  </button>
                 )}
               </div>
               <input
+                id={`edit-image-upload-${item.item_id}`}
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
-                className="flex-1 border border-gray-300 rounded-md p-2"
+                className="flex-1 border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
               />
             </div>
           </div>
@@ -297,14 +320,16 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
             >
+              <X size={18} />
               キャンセル
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center gap-2"
             >
+              <Save size={18} />
               保存
             </button>
           </div>
@@ -693,7 +718,7 @@ export default function ItemList() {
           placeholder="物品IDまたは物品名で検索"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full border border-gray-300 rounded-md p-2"
+          className="w-full border border-gray-300 rounded-md p-2 font-mono"
         />
       </div>
   

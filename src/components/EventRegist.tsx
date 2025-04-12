@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-import { AlertCircle, X } from 'lucide-react';
+// CheckCircle アイコンをインポート
+import { AlertCircle, X, CheckCircle } from 'lucide-react';
 
 interface NotificationProps {
   message: string;
@@ -210,9 +211,12 @@ export default function EventRegist() {
         <div className="flex gap-4">
           <button
             type="submit"
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+            // flex, items-center, gap-2 を追加
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors flex items-center gap-2"
             disabled={isSubmitting}
           >
+            {/* CheckCircle アイコンを追加 */}
+            <CheckCircle size={18} />
             {isSubmitting ? '登録中...' : '登録'}
           </button>
         </div>

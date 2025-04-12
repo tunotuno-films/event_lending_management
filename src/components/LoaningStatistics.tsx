@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertCircle, X, Download} from 'lucide-react';
+import { AlertCircle, X, Download, Package } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
-const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Event {
   event_id: string;
@@ -68,16 +66,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
 const HOURS = Array.from({ length: 24 }, (_, i) => 
   `${i.toString().padStart(2, '0')}:00`
 );
-
-const getItemImageUrl = (imageUrl: string | null | undefined): string => {
-  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
-  try {
-    new URL(imageUrl);
-    return imageUrl;
-  } catch (e) {
-    return DEFAULT_IMAGE;
-  }
-};
 
 const formatDuration = (seconds: number): string => {
   if (seconds < 0) return '0時間0分0秒'; // 負の値は0として扱う
@@ -240,7 +228,7 @@ export default function LoaningStatistics() {
         const existingStats = itemStats.get(itemId) || {
           item_id: itemId,
           item_name: itemName || '名前不明',
-          image: itemImage || DEFAULT_IMAGE,
+          image: itemImage || '',
           loan_count: 0,
           total_duration: 0,
           average_duration: 0,
@@ -693,13 +681,18 @@ export default function LoaningStatistics() {
                   return (
                     <tr key={mergeByName ? stat.item_name : stat.item_id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
-                          <img
-                            src={getItemImageUrl(stat.image)}
-                            alt={stat.item_name}
-                            className="max-h-full max-w-full object-contain"
-                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                          />
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                          {stat.image && stat.image.trim() !== '' ? (
+                            <img
+                              src={stat.image}
+                              alt={stat.item_name}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                              <Package className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
@@ -747,20 +740,20 @@ export default function LoaningStatistics() {
                 <div className="inline-block min-w-full border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
-                      <tr>
-                        <th className="sticky left-0 z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                      <tr className="relative">
+                        <th className="sticky left-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
                           画像
                         </th>
-                        <th className="sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] min-[1800px]:hidden">
+                        <th className="sticky left-[100px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] min-[1800px]:hidden border-l-0">
                           物品情報
                         </th>
-                        <th 
-                          className="hidden min-[1800px]:table-cell sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        <th
+                          className="hidden min-[1800px]:table-cell sticky left-[100px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-l-0"
                         >
                           物品ID
                         </th>
-                        <th 
-                          className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs"
+                        <th
+                          className="hidden min-[1800px]:table-cell sticky left-[250px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs border-l-0"
                         >
                           物品名
                         </th>
@@ -798,36 +791,38 @@ export default function LoaningStatistics() {
                         }
 
                         return (
-                          <tr key={`heatmap-${mergeByName ? stat.item_name : stat.item_id}`} className="hover:bg-gray-50">
-                            <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
-                              <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
-                                <img
-                                  src={getItemImageUrl(stat.image)}
-                                  alt={stat.item_name}
-                                  className="max-h-full max-w-full object-contain"
-                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                                />
+                          <tr key={`heatmap-${mergeByName ? stat.item_name : stat.item_id}`} className="relative">
+                            <td className="sticky left-0 z-20 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
+                              <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                                {stat.image && stat.image.trim() !== '' ? (
+                                  <img
+                                    src={stat.image}
+                                    alt={stat.item_name}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
                               </div>
                             </td>
-                            <td className="sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[150px] min-[1800px]:hidden">
+                            <td className="sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap w-[150px] min-[1800px]:hidden border-l-0">
                               <div className="flex flex-col">
-                                <div className="flex items-baseline">
-                                  <div className="text-sm font-mono">{displayItemId}</div>
-                                  {fractionDisplay}
-                                </div>
-                                <span className="text-xs text-gray-600">{stat.item_name}</span>
+                                <span className="text-sm font-mono">{displayItemId}{fractionDisplay}</span>
+                                <span className="text-xs text-gray-600 break-words whitespace-normal">{stat.item_name}</span>
                               </div>
                             </td>
-                            <td 
-                              className="hidden min-[1800px]:table-cell sticky left-[100px] z-10 bg-white px-6 py-4 whitespace-nowrap"
+                            <td
+                              className="hidden min-[1800px]:table-cell sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap border-l-0"
                             >
                               <div className="flex items-baseline">
                                 <div className="text-sm font-mono">{displayItemId}</div>
                                 {fractionDisplay}
                               </div>
                             </td>
-                            <td 
-                              className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-white px-6 py-4 whitespace-nowrap max-w-xs"
+                            <td
+                              className="hidden min-[1800px]:table-cell sticky left-[250px] z-20 bg-white px-6 py-4 whitespace-nowrap max-w-xs border-l-0"
                             >
                               <div className="text-sm truncate" title={stat.item_name}>{stat.item_name}</div>
                             </td>

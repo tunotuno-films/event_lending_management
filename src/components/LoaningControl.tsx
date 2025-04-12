@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'; // useCallback を追加
-import { supabase, insertWithOwnerId } from '../lib/supabase'; // getCurrentUserId をインポート
-import { AlertCircle, X, Barcode, StopCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase, insertWithOwnerId } from '../lib/supabase';
+import { AlertCircle, X, Barcode, StopCircle, Package } from 'lucide-react';
 import { useZxing } from 'react-zxing';
-
-// ★ デフォルト画像URLを追加
-const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 // --- インターフェース定義 (修正) ---
 interface Event {
@@ -43,19 +40,13 @@ interface NotificationProps {
 
 // Notification コンポーネントを修正
 const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) => {
-  // カウントダウン用のステート
   const [countdown, setCountdown] = useState(5);
 
-  // 自動的に閉じる処理を修正
   useEffect(() => {
-    // まずタイマーをクリアし、カウントダウンをリセット
     setCountdown(5);
-    
-    // 1秒ごとにカウントダウン
     const timer = setInterval(() => {
       setCountdown(prev => {
         const newCount = prev - 1;
-        // 0になったらタイマーをクリアして閉じる
         if (newCount <= 0) {
           clearInterval(timer);
           if (onClose) onClose();
@@ -64,11 +55,10 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
       });
     }, 1000);
 
-    // クリーンアップ：コンポーネントがアンマウントされたらタイマーをクリア
     return () => {
       clearInterval(timer);
     };
-  }, [message, onClose]); // messageが変わったときもリセットするため、依存配列に追加
+  }, [message, onClose]);
 
   return (
     <div className={`fixed top-4 right-4 p-4 rounded-md shadow-md z-50 flex items-center ${
@@ -96,29 +86,17 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
   );
 };
 
-// ★ 画像URLヘルパー関数を追加
-const getItemImageUrl = (imageUrl: string | null | undefined): string => {
-  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
-  try {
-    new URL(imageUrl);
-    return imageUrl;
-  } catch (e) {
-    return DEFAULT_IMAGE;
-  }
-};
-
 export default function LoaningControl() {
-  const [events, setEvents] = useState<Event[]>([]); // イベントリスト (id, event_id, name)
-  const [selectedEventId, setSelectedEventId] = useState(''); // 選択中の古い event_id (varchar)
-  const [selectedEventRefId, setSelectedEventRefId] = useState<number | null>(null); // ★ 選択中の新しい event.id (int8)
-  const [waitingItems, setWaitingItems] = useState<Control[]>([]); // 待機中リスト
-  const [loanedItems, setLoanedItems] = useState<Control[]>([]);   // 貸出中リスト
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedEventRefId, setSelectedEventRefId] = useState<number | null>(null);
+  const [waitingItems, setWaitingItems] = useState<Control[]>([]);
+  const [loanedItems, setLoanedItems] = useState<Control[]>([]);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
-  const [currentTime, setCurrentTime] = useState(new Date()); // リアルタイム更新用の現在時刻
-  const [isProcessing, setIsProcessing] = useState(false); // 貸出/返却処理中フラグ
-  const [isLoadingItems, setIsLoadingItems] = useState(false); // アイテムリスト読み込み中フラグ
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
 
-  // バーコード関連のステート定義
   const [barcodeInput, setBarcodeInput] = useState('');
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [showItemIdModal, setShowItemIdModal] = useState(false);
@@ -126,7 +104,6 @@ export default function LoaningControl() {
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
 
-  // バーコードスキャナーの設定
   const { ref } = useZxing({
     onDecodeResult(result) {
       const scannedBarcode = result.getText();
@@ -138,7 +115,6 @@ export default function LoaningControl() {
     paused: !isScanning
   });
 
-  // 現在時刻を1秒ごとに更新するuseEffect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -147,7 +123,6 @@ export default function LoaningControl() {
     return () => clearInterval(timer);
   }, []);
 
-  // useEffect追加 - バーコードモーダル関連
   useEffect(() => {
     if (showBarcodeModal) {
       setIsScanning(true);
@@ -166,7 +141,6 @@ export default function LoaningControl() {
     }
   }, [isScanning, showCamera]);
 
-  // アイテム検索関連のuseEffect追加
   useEffect(() => {
     if (barcodeInput && selectedEventId) {
       const allItems = [...waitingItems, ...loanedItems];
@@ -180,17 +154,13 @@ export default function LoaningControl() {
     }
   }, [barcodeInput, waitingItems, loanedItems, selectedEventId]);
 
-  // 現在時刻更新用 (変更なし)
-  useEffect(() => { /* ... */ }, []);
-
-  // イベントリスト取得 (変更なし、ただしselectするカラムは要確認)
   const fetchEvents = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { console.error('ユーザー情報が取得できません'); return; }
       const { data, error } = await supabase
         .from('events')
-        .select('id, event_id, name') // ★ 新しい主キー 'id' も取得
+        .select('id, event_id, name')
         .eq('event_deleted', false)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -202,7 +172,6 @@ export default function LoaningControl() {
     fetchEvents();
   }, [fetchEvents]);
 
-  // --- アイテムリスト取得関数 (修正) ---
   const fetchItems = useCallback(async () => {
     if (!selectedEventId) return;
 
@@ -210,7 +179,6 @@ export default function LoaningControl() {
     console.log(`Fetching items for event: ${selectedEventId}`);
 
     try {
-      // リレーショナルクエリ - シンプルにして高速化
       const { data, error } = await supabase
         .from('control')
         .select(`
@@ -231,15 +199,13 @@ export default function LoaningControl() {
         throw error;
       }
 
-      // データを整形 - シンプルに高速化
       const formattedData = data?.map(item => ({
         ...item,
         items: Array.isArray(item.items) ? item.items[0] : item.items,
-        created_by: item.created_by || '', // 必須プロパティ
-        events: null // 必須プロパティ
+        created_by: item.created_by || '',
+        events: null
       })) as Control[] || [];
 
-      // ステータスでフィルタリング
       const waiting = formattedData.filter(item => !item.status);
       const loaned = formattedData.filter(item => item.status);
 
@@ -257,17 +223,14 @@ export default function LoaningControl() {
     } finally {
       setIsLoadingItems(false);
     }
-  }, [selectedEventId]); // selectedEventIdが変わったときだけ再生成
+  }, [selectedEventId]);
 
-  // ★ イベント選択変更時の処理を修正
   const handleEventChange = useCallback((selectedOldEventId: string) => {
-    setSelectedEventId(selectedOldEventId); // 古いIDを保持 (UI選択用)
-    localStorage.setItem('selectedEventId', selectedOldEventId); // localStorageに保存
-    // 選択された古いIDに対応する新しいID(int8)を探してステートにセット
+    setSelectedEventId(selectedOldEventId);
+    localStorage.setItem('selectedEventId', selectedOldEventId);
     const selectedEvent = events.find(event => event.event_id === selectedOldEventId);
     setSelectedEventRefId(selectedEvent ? selectedEvent.id : null);
 
-    // 選択直後に一度だけ実行するため、fetchItemsを直接呼び出す
     if (selectedOldEventId) {
       fetchItems();
     }
@@ -281,19 +244,15 @@ export default function LoaningControl() {
     window.dispatchEvent(new CustomEvent('selectedEventChanged'));
   }, [events, fetchItems]);
 
-  // useEffect for item fetch - selectedEventIdが変更されたときのみ実行されるようにする
   useEffect(() => {
-    // 初期ロード時に不要な呼び出しを避ける
     if (selectedEventId) {
       fetchItems();
     }
   }, [selectedEventId, fetchItems]);
 
-  // バックグラウンドで定期更新するuseEffectを追加（オプション）
   useEffect(() => {
     if (!selectedEventId) return;
 
-    // 30秒ごとに自動更新
     const intervalId = setInterval(() => {
       fetchItems();
     }, 30000);
@@ -301,7 +260,6 @@ export default function LoaningControl() {
     return () => clearInterval(intervalId);
   }, [selectedEventId, fetchItems]);
 
-  // 新規: 初回レンダリング時にlocalStorageから選択イベントを読み込む
   useEffect(() => {
     const storedEventId = localStorage.getItem('selectedEventId');
     if (storedEventId) {
@@ -309,11 +267,9 @@ export default function LoaningControl() {
     }
   }, []);
 
-  // --- 貸出処理 (修正) ---
   const handleLoanItem = async (controlRecord: Control) => {
     if (isProcessing) return;
 
-    // 必要な情報を取得
     const controlId = controlRecord.control_id;
     const oldItemId = controlRecord.items?.item_id;
 
@@ -329,19 +285,17 @@ export default function LoaningControl() {
     setIsProcessing(true);
 
     try {
-      // control_datetimeを現在時刻で更新
       const loanTime = new Date().toISOString();
       const { error } = await supabase
         .from('control')
         .update({
           status: true,
-          control_datetime: loanTime  // control_datetimeを設定
+          control_datetime: loanTime
         })
         .eq('control_id', controlId);
 
       if (error) throw error;
 
-      // 貸出成功時のグローバルイベント発行
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'loan', success: true }
       }));
@@ -352,11 +306,10 @@ export default function LoaningControl() {
         type: 'success'
       });
 
-      fetchItems(); // リスト再取得
+      fetchItems();
       setBarcodeInput('');
       setMatchingItems([]);
       
-      // モーダルを閉じる
       setShowBarcodeModal(false);
       setShowItemIdModal(false);
     } catch (error) {
@@ -371,7 +324,6 @@ export default function LoaningControl() {
     }
   };
 
-  // --- 返却処理 (修正) ---
   const handleItemReturn = async (controlRecord: Control) => {
     if (isProcessing) return;
 
@@ -395,32 +347,29 @@ export default function LoaningControl() {
     const returnTime = new Date().toISOString();
 
     try {
-      // ステータスを更新し、control_datetimeをリセット
       const { error: updateError } = await supabase
         .from('control')
         .update({
           status: false,
-          control_datetime: null // 貸出日時をリセット
+          control_datetime: null
         })
         .eq('control_id', controlId);
 
       if (updateError) throw updateError;
 
-      // 返却成功時のグローバルイベント発行
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'return', success: true }
       }));
 
-      // 履歴を記録 - resultテーブルに古いIDも含めて保存
       if (loanTime && oldItemId && oldEventId) {
         try {
           const { error: resultError } = await insertWithOwnerId(
             'result',
             {
-              item_id: oldItemId,         // 古いitem_id (varchar)
-              event_id: oldEventId,       // 古いevent_id (varchar)
-              item_id_ref: itemIdRef,     // 新しいitem.id (int8)
-              event_id_ref: eventIdRef || selectedEventRefId,   // 新しいevent.id (int8)を使用、なければ選択中のイベントIDを使用
+              item_id: oldItemId,
+              event_id: oldEventId,
+              item_id_ref: itemIdRef,
+              event_id_ref: eventIdRef || selectedEventRefId,
               start_datetime: loanTime,
               end_datetime: returnTime
             }
@@ -448,7 +397,6 @@ export default function LoaningControl() {
       setBarcodeInput('');
       setMatchingItems([]);
       
-      // モーダルを閉じる
       setShowBarcodeModal(false);
       setShowItemIdModal(false);
     } catch (error) {
@@ -463,7 +411,6 @@ export default function LoaningControl() {
     }
   };
 
-  // バーコード送信処理
   const handleBarcodeSubmit = async (barcode: string) => {
     if (!selectedEventId) {
       setNotification({
@@ -502,12 +449,11 @@ export default function LoaningControl() {
         return;
       }
 
-      // データを整形
       const formattedData = data.map(item => ({
         ...item,
         items: Array.isArray(item.items) ? item.items[0] : item.items,
-        events: null, // 必須プロパティを追加
-        created_by: item.created_by || '' // 必須プロパティを確保
+        events: null,
+        created_by: item.created_by || ''
       })) as Control[];
 
       setBarcodeInput(barcode);
@@ -522,18 +468,16 @@ export default function LoaningControl() {
     }
   };
 
-  // 数字入力ハンドラ
   const handleNumericInput = (value: string) => {
     const numericValue = value.replace(/[^0-9]/g, '');
     setBarcodeInput(numericValue);
   };
 
-  // 経過時間フォーマット関数を修正 - currentTimeを使用するように変更
   const formatElapsedTime = useCallback((startTime: string | null): string => {
     if (!startTime) return '-';
 
     try {
-      const now = currentTime.getTime(); // useState経由で更新される現在時刻を使用
+      const now = currentTime.getTime();
       const start = new Date(startTime).getTime();
       const elapsed = Math.max(0, Math.floor((now - start) / 1000));
 
@@ -546,12 +490,10 @@ export default function LoaningControl() {
       console.error('時間計算エラー:', error);
       return '-';
     }
-  }, [currentTime]); // currentTimeが変わるたびに関数を再生成
+  }, [currentTime]);
 
-  // --- レンダリング部分 (主な変更点) ---
   return (
     <div className="space-y-6">
-      {/* Notification */}
       {notification.show && (
         <Notification 
           message={notification.message} 
@@ -560,7 +502,6 @@ export default function LoaningControl() {
         />
       )}
 
-      {/* イベント選択 */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-semibold mb-6">貸出・返却管理</h2>
         <div className="mb-6">
@@ -583,10 +524,8 @@ export default function LoaningControl() {
         </div>
       </div>
 
-      {/* イベント選択後の表示 */}
       {selectedEventId && (
         <>
-          {/* バーコード/ID入力ボタン */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button 
               onClick={() => setShowBarcodeModal(true)} 
@@ -608,7 +547,6 @@ export default function LoaningControl() {
             </button>
           </div>
 
-          {/* バーコードモーダル */}
           {showBarcodeModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
@@ -668,33 +606,30 @@ export default function LoaningControl() {
                 {matchingItems.length > 0 && (
                   <div className="mt-4 border-t pt-4">
                     <h4 className="text-sm font-semibold mb-2">一致するアイテム:</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto"> {/* Add scroll */}
-                      {matchingItems.map((item) => (
-                        <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                          <div className="flex items-center gap-2 overflow-hidden mr-2"> {/* Add overflow */}
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
-                              <img
-                                src={getItemImageUrl(item.items?.image)}
-                                alt={item.items?.name || '物品画像'}
-                                className="max-h-full max-w-full object-contain"
-                                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                              />
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {matchingItems.map((item) => {
+                        const imageUrl = item.items?.image;
+                        const itemName = item.items?.name || '不明な物品';
+                        return (
+                          <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <div className="flex items-center gap-2 overflow-hidden mr-2">
+                              <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
+                                {imageUrl && imageUrl.trim() !== '' ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={itemName}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                    <Package className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-sm font-mono flex-shrink-0">{item.item_id}</span>
-                            {/* Allow name to wrap or truncate */}
-                            <span className="text-sm truncate" title={item.items?.name ?? '不明な物品'}>{item.items?.name ?? '不明な物品'}</span>
                           </div>
-                          <button
-                            onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap flex-shrink-0 ${ // Add flex-shrink-0
-                              item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
-                            }`}
-                            disabled={isProcessing}
-                          >
-                            {item.status ? '返却' : '貸出'}
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -702,7 +637,6 @@ export default function LoaningControl() {
             </div>
           )}
 
-          {/* アイテムIDモーダル */}
           {showItemIdModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
@@ -757,33 +691,30 @@ export default function LoaningControl() {
                 {matchingItems.length > 0 && (
                   <div className="mt-4 border-t pt-4">
                     <h4 className="text-sm font-semibold mb-2">一致するアイテム:</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto"> {/* Add scroll */}
-                      {matchingItems.map((item) => (
-                        <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                           <div className="flex items-center gap-2 overflow-hidden mr-2"> {/* Add overflow */}
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
-                              <img
-                                src={getItemImageUrl(item.items?.image)}
-                                alt={item.items?.name || '物品画像'}
-                                className="max-h-full max-w-full object-contain"
-                                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                              />
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {matchingItems.map((item) => {
+                        const imageUrl = item.items?.image;
+                        const itemName = item.items?.name || '不明な物品';
+                        return (
+                          <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <div className="flex items-center gap-2 overflow-hidden mr-2">
+                              <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
+                                {imageUrl && imageUrl.trim() !== '' ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={itemName}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                    <Package className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-sm font-mono flex-shrink-0">{item.item_id}</span>
-                            {/* Allow name to wrap or truncate */}
-                            <span className="text-sm truncate" title={item.items?.name ?? '不明な物品'}>{item.items?.name ?? '不明な物品'}</span>
                           </div>
-                          <button
-                            onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap flex-shrink-0 ${ // Add flex-shrink-0
-                              item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
-                            }`}
-                            disabled={isProcessing}
-                          >
-                            {item.status ? '返却' : '貸出'}
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -791,9 +722,7 @@ export default function LoaningControl() {
             </div>
           )}
 
-          {/* アイテムリスト - ローディング中でも表示 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 待機中リスト */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="text-lg font-semibold">待機中のアイテム ({waitingItems.length})</h3>
@@ -808,7 +737,6 @@ export default function LoaningControl() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        {/* 物品名ヘッダーを1800px以上で表示 */}
                         <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                       </tr>
@@ -817,35 +745,41 @@ export default function LoaningControl() {
                       {waitingItems.length === 0 ? (
                         <tr><td colSpan={4} className="text-center py-4 text-gray-500">待機中のアイテムはありません</td></tr>
                       ) : (
-                        waitingItems.map((control) => (
-                          <tr key={control.control_id}>
-                            <td className="px-4 py-2">
-                              <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
-                                <img
-                                  src={getItemImageUrl(control.items?.image)}
-                                  alt={control.items?.name || 'アイテム画像'}
-                                  className="max-h-full max-w-full object-contain"
-                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                                />
-                              </div>
-                            </td>
-                            {/* 物品IDと物品名を一つのセルにまとめる */}
-                            <td className="px-4 py-2">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                {/* 物品名を1800px未満で表示 */}
-                                <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
-                              </div>
-                            </td>
-                            {/* 物品名セルを1800px以上で表示 */}
-                            <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
-                              <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
-                            </td>
-                            <td className="px-4 py-2">
-                              <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
-                            </td>
-                          </tr>
-                        ))
+                        waitingItems.map((control) => {
+                          const imageUrl = control.items?.image;
+                          const itemName = control.items?.name || 'アイテム画像';
+                          return (
+                            <tr key={control.control_id}>
+                              <td className="px-4 py-2">
+                                <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                  {imageUrl && imageUrl.trim() !== '' ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={itemName}
+                                      className="max-h-full max-w-full object-contain"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                      <Package className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                  <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                </div>
+                              </td>
+                              <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                                <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -853,7 +787,6 @@ export default function LoaningControl() {
               </div>
             </div>
 
-            {/* 貸出中リスト */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="text-lg font-semibold">貸出中のアイテム ({loanedItems.length})</h3>
@@ -868,7 +801,6 @@ export default function LoaningControl() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        {/* 物品名ヘッダーを1800px以上で表示 */}
                         <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
@@ -878,38 +810,44 @@ export default function LoaningControl() {
                       {loanedItems.length === 0 ? (
                         <tr><td colSpan={5} className="text-center py-4 text-gray-500">貸出中のアイテムはありません</td></tr>
                       ) : (
-                        loanedItems.map((control) => (
-                          <tr key={control.control_id}>
-                            <td className="px-4 py-2">
-                              <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
-                                <img
-                                  src={getItemImageUrl(control.items?.image)}
-                                  alt={control.items?.name || 'アイテム画像'}
-                                  className="max-h-full max-w-full object-contain"
-                                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                                />
-                              </div>
-                            </td>
-                            {/* 物品IDと物品名を一つのセルにまとめる */}
-                            <td className="px-4 py-2">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                {/* 物品名を1800px未満で表示 */}
-                                <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
-                              </div>
-                            </td>
-                            {/* 物品名セルを1800px以上で表示 */}
-                            <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
-                              <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
-                            </td>
-                            <td className="px-4 py-2">
-                              <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
-                                返却
-                              </button>
-                            </td>
-                            <td className="px-4 py-2"><span className="text-sm text-red-500">{formatElapsedTime(control.control_datetime)}</span></td>
-                          </tr>
-                        ))
+                        loanedItems.map((control) => {
+                          const imageUrl = control.items?.image;
+                          const itemName = control.items?.name || 'アイテム画像';
+                          return (
+                            <tr key={control.control_id}>
+                              <td className="px-4 py-2">
+                                <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                  {imageUrl && imageUrl.trim() !== '' ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={itemName}
+                                      className="max-h-full max-w-full object-contain"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                      <Package className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                  <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                </div>
+                              </td>
+                              <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                                <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
+                                  返却
+                                </button>
+                              </td>
+                              <td className="px-4 py-2"><span className="text-sm text-red-500">{formatElapsedTime(control.control_datetime)}</span></td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

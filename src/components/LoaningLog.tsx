@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
-import { AlertCircle, X, Download, Clock } from 'lucide-react';
-
-const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+import { AlertCircle, X, Download, Clock, Package } from 'lucide-react';
 
 interface Event {
   event_id: string;
@@ -66,16 +64,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
       </div>
     </div>
   );
-};
-
-const getItemImageUrl = (imageUrl: string | null | undefined): string => {
-  if (!imageUrl || imageUrl.trim() === '') return DEFAULT_IMAGE;
-  try {
-    new URL(imageUrl);
-    return imageUrl;
-  } catch (e) {
-    return DEFAULT_IMAGE;
-  }
 };
 
 export default function LoaningLog() {
@@ -621,6 +609,9 @@ export default function LoaningLog() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedLoanRecords.map((record) => {
+                  const item = record.item || record.items;
+                  const imageUrl = item?.image;
+                  const itemName = item?.name || '名前不明';
                   const startTimeStr = formatTimeOnly(record.start_datetime);
                   const endTimeStr = record.end_datetime ? formatTimeOnly(record.end_datetime) : '未返却';
                   const durationStr = formatLoanDuration(record.start_datetime, record.end_datetime);
@@ -628,19 +619,24 @@ export default function LoaningLog() {
                   return (
                     <tr key={record.result_id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white border">
-                          <img
-                            src={getItemImageUrl(record.item?.image)}
-                            alt={record.item?.name || 'アイテム画像'}
-                            className="max-h-full max-w-full object-contain"
-                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                          />
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                          {imageUrl && imageUrl.trim() !== '' ? (
+                            <img
+                              src={imageUrl}
+                              alt={itemName}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                              <Package className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 min-[1800px]:hidden">
                         <div className="flex flex-col">
                           <span className="text-sm font-mono">{record.item_id || '-'}</span>
-                          <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
+                          <span className="text-xs text-gray-600">{itemName}</span>
                         </div>
                       </td>
                       <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
@@ -649,7 +645,7 @@ export default function LoaningLog() {
                         </div>
                       </td>
                       <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
-                        <div className="text-sm truncate" title={record.item?.name || '不明なアイテム'}>{record.item?.name || '不明なアイテム'}</div>
+                        <div className="text-sm truncate" title={itemName}>{itemName}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1 text-sm font-mono">

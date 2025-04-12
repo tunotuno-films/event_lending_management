@@ -446,8 +446,8 @@ export default function EventsList() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{event.name}</div>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-900 break-words max-w-xs" title={event.name}>{event.name}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatDate(event.created_at)}

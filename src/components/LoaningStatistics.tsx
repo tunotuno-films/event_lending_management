@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertCircle, X, Download } from 'lucide-react';
+import { AlertCircle, X, Download} from 'lucide-react';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
@@ -75,6 +79,42 @@ const getItemImageUrl = (imageUrl: string | null | undefined): string => {
   }
 };
 
+const formatDuration = (seconds: number): string => {
+  if (seconds < 0) return '0時間0分0秒'; // 負の値は0として扱う
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  // 0秒の場合も考慮
+  if (hours === 0 && minutes === 0 && remainingSeconds === 0) {
+    return '0時間0分0秒';
+  }
+
+  let result = '';
+  if (hours > 0) {
+    result += `${hours}時間`;
+  }
+  if (minutes > 0 || hours > 0) { // 時間がある場合、分が0でも表示
+    result += `${minutes}分`;
+  }
+  result += `${remainingSeconds}秒`;
+
+  return result;
+};
+
+// 色生成関数（HLS色空間を利用して区別しやすい色を生成）
+const generateDistinctColors = (count: number): string[] => {
+  const colors: string[] = [];
+  const saturation = 70; // 彩度
+  const lightness = 60; // 明度
+  for (let i = 0; i < count; i++) {
+    const hue = (i * (360 / count)) % 360; // 色相を均等に分散
+    colors.push(`hsla(${hue}, ${saturation}%, ${lightness}%, 0.7)`); // 半透明にする
+  }
+  return colors;
+};
+
 export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -84,10 +124,11 @@ export default function LoaningStatistics() {
     message: '',
     type: 'success'
   });
+  // sortConfig の初期値を貸出回数の降順に設定
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ItemStatistics | 'item_info';
     direction: 'asc' | 'desc';
-  } | null>(null);
+  } | null>({ key: 'loan_count', direction: 'desc' });
   const [mergeByName, setMergeByName] = useState(false);
   const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
@@ -409,14 +450,6 @@ export default function LoaningStatistics() {
     return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
   const downloadCSV = () => {
     const dataToExport = sortedDisplayStatistics;
     if (dataToExport.length === 0) return;
@@ -477,6 +510,34 @@ export default function LoaningStatistics() {
       color: opacity > 0.5 ? 'white' : 'black'
     };
   };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: '貸出回数の時間帯別分布',
+      },
+    },
+  };
+
+  const chartData = useMemo(() => {
+    const labels = HOURS;
+    // データセットの数に基づいて色を生成
+    const colors = generateDistinctColors(sortedDisplayStatistics.length);
+
+    const datasets = sortedDisplayStatistics.map((stat, index) => ({
+      label: stat.item_name,
+      data: stat.hourly_usage,
+      // 生成した色を順番に割り当てる
+      backgroundColor: colors[index % colors.length],
+    }));
+
+    return { labels, datasets };
+  }, [sortedDisplayStatistics]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -570,7 +631,7 @@ export default function LoaningStatistics() {
                   </th>
                   <th
                     onClick={() => isWideScreen && handleSort('item_name')}
-                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_name')}`}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('item_name')}`}
                   >
                     <button className="flex items-center gap-1 hover:text-gray-700">
                       物品名 {getSortIndicator('item_name')}
@@ -660,8 +721,8 @@ export default function LoaningStatistics() {
                           {fractionDisplay}
                         </div>
                       </td>
-                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">{stat.item_name}</div>
+                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap max-w-xs">
+                        <div className="text-sm truncate" title={stat.item_name}>{stat.item_name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">{stat.loan_count}回</div>
@@ -693,7 +754,9 @@ export default function LoaningStatistics() {
                         <th className="sticky left-[100px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px]">
                           物品情報
                         </th>
-                        <th className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px]">
+                        <th 
+                          className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs"
+                        >
                           物品名
                         </th>
                         {HOURS.map(hour => (
@@ -754,8 +817,10 @@ export default function LoaningStatistics() {
                                 {fractionDisplay}
                               </div>
                             </td>
-                            <td className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-white px-6 py-4 whitespace-nowrap w-[200px]">
-                              <div className="text-sm">{stat.item_name}</div>
+                            <td 
+                              className="hidden min-[1800px]:table-cell sticky left-[250px] z-10 bg-white px-6 py-4 whitespace-nowrap max-w-xs"
+                            >
+                              <div className="text-sm truncate" title={stat.item_name}>{stat.item_name}</div>
                             </td>
                             {stat.hourly_usage.map((count, index) => (
                               <td key={`heatmap-cell-${mergeByName ? stat.item_name : stat.item_id}-${index}`} className="px-2 py-4 text-center w-[50px] min-w-[50px]">
@@ -777,6 +842,11 @@ export default function LoaningStatistics() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4">貸出回数の時間帯別分布</h3>
+            <Bar options={chartOptions} data={chartData} />
           </div>
         </>
       )}

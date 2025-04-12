@@ -719,7 +719,7 @@ export default function ItemList() {
               </th>
               <th
                 onClick={() => isWideScreen && handleSort('name')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('name')}`}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('name')}`}
               >
                 物品名 {getSortIndicator('name')}
               </th>
@@ -768,10 +768,10 @@ export default function ItemList() {
                     />
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                <td className="px-6 py-4 min-[1800px]:hidden">
                   <div className="flex flex-col">
                     <span className="text-sm font-mono">{item.item_id}</span>
-                    <span className="text-xs text-gray-600">{item.name}</span>
+                    <span className="text-xs text-gray-600 break-words">{item.name}</span>
                   </div>
                 </td>
                 <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
@@ -779,12 +779,12 @@ export default function ItemList() {
                     {item.item_id}
                   </div>
                 </td>
-                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{item.name}</div>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
+                  <div className="text-sm text-gray-900 truncate" title={item.name}>{item.name}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
-                  <div className="flex flex-col">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 mb-1 w-fit">
+                <td className="px-6 py-4 min-[1800px]:hidden">
+                  <div className="flex flex-col gap-1">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 w-fit">
                       {item.genre}
                     </span>
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 w-fit">
@@ -802,7 +802,7 @@ export default function ItemList() {
                     {item.manager}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-6 py-4 text-sm text-gray-500">
                   {formatDate(item.registered_date)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">

@@ -668,11 +668,11 @@ export default function LoaningControl() {
                 {matchingItems.length > 0 && (
                   <div className="mt-4 border-t pt-4">
                     <h4 className="text-sm font-semibold mb-2">一致するアイテム:</h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-60 overflow-y-auto"> {/* Add scroll */}
                       {matchingItems.map((item) => (
                         <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border">
+                          <div className="flex items-center gap-2 overflow-hidden mr-2"> {/* Add overflow */}
+                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
                               <img
                                 src={getItemImageUrl(item.items?.image)}
                                 alt={item.items?.name || '物品画像'}
@@ -680,12 +680,13 @@ export default function LoaningControl() {
                                 onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                               />
                             </div>
-                            <span className="text-sm font-mono">{item.item_id}</span>
-                            <span className="text-sm">{item.items?.name ?? '不明な物品'}</span>
+                            <span className="text-sm font-mono flex-shrink-0">{item.item_id}</span>
+                            {/* Allow name to wrap or truncate */}
+                            <span className="text-sm truncate" title={item.items?.name ?? '不明な物品'}>{item.items?.name ?? '不明な物品'}</span>
                           </div>
                           <button
                             onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap ${
+                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap flex-shrink-0 ${ // Add flex-shrink-0
                               item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
                             }`}
                             disabled={isProcessing}
@@ -756,11 +757,11 @@ export default function LoaningControl() {
                 {matchingItems.length > 0 && (
                   <div className="mt-4 border-t pt-4">
                     <h4 className="text-sm font-semibold mb-2">一致するアイテム:</h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-60 overflow-y-auto"> {/* Add scroll */}
                       {matchingItems.map((item) => (
                         <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border">
+                           <div className="flex items-center gap-2 overflow-hidden mr-2"> {/* Add overflow */}
+                            <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
                               <img
                                 src={getItemImageUrl(item.items?.image)}
                                 alt={item.items?.name || '物品画像'}
@@ -768,12 +769,13 @@ export default function LoaningControl() {
                                 onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                               />
                             </div>
-                            <span className="text-sm font-mono">{item.item_id}</span>
-                            <span className="text-sm">{item.items?.name ?? '不明な物品'}</span>
+                            <span className="text-sm font-mono flex-shrink-0">{item.item_id}</span>
+                            {/* Allow name to wrap or truncate */}
+                            <span className="text-sm truncate" title={item.items?.name ?? '不明な物品'}>{item.items?.name ?? '不明な物品'}</span>
                           </div>
                           <button
                             onClick={() => item.status ? handleItemReturn(item) : handleLoanItem(item)}
-                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap ${
+                            className={`px-2 py-1 text-xs rounded text-white whitespace-nowrap flex-shrink-0 ${ // Add flex-shrink-0
                               item.status ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
                             }`}
                             disabled={isProcessing}
@@ -807,7 +809,7 @@ export default function LoaningControl() {
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
                         {/* 物品名ヘッダーを1800px以上で表示 */}
-                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                       </tr>
                     </thead>
@@ -836,7 +838,9 @@ export default function LoaningControl() {
                               </div>
                             </td>
                             {/* 物品名セルを1800px以上で表示 */}
-                            <td className="hidden min-[1800px]:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                              <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                            </td>
                             <td className="px-4 py-2">
                               <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
                             </td>
@@ -865,7 +869,7 @@ export default function LoaningControl() {
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
                         {/* 物品名ヘッダーを1800px以上で表示 */}
-                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品名</th>
+                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
                       </tr>
@@ -895,7 +899,9 @@ export default function LoaningControl() {
                               </div>
                             </td>
                             {/* 物品名セルを1800px以上で表示 */}
-                            <td className="hidden min-[1800px]:table-cell px-4 py-2"><span className="text-sm">{control.items?.name ?? '不明な物品'}</span></td>
+                            <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                              <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                            </td>
                             <td className="px-4 py-2">
                               <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
                                 返却

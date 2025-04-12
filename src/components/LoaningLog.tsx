@@ -511,7 +511,7 @@ export default function LoaningLog() {
                   </th>
                   <th
                     onClick={() => isWideScreen && handleSort('item')}
-                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item')}`}
+                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('item')}`}
                   >
                      <button className="flex items-center gap-1 hover:text-gray-700">
                        物品名 {getSortIndicator('item')}
@@ -550,7 +550,7 @@ export default function LoaningLog() {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap min-[1800px]:hidden">
+                    <td className="px-6 py-4 min-[1800px]:hidden">
                       <div className="flex flex-col">
                         <span className="text-sm font-mono">{record.item_id || '-'}</span>
                         <span className="text-xs text-gray-600">{record.item?.name || '不明なアイテム'}</span>
@@ -561,15 +561,15 @@ export default function LoaningLog() {
                         {record.item_id || '-'}
                       </div>
                     </td>
-                    <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{record.item?.name || '不明なアイテム'}</div>
+                    <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
+                      <div className="text-sm truncate" title={record.item?.name || '不明なアイテム'}>{record.item?.name || '不明なアイテム'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                        <div className="text-sm">
                         {formatJSTDateTime(record.start_datetime)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                        <div className="text-sm">
                         {record.end_datetime
                           ? formatJSTDateTime(record.end_datetime)

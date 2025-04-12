@@ -117,6 +117,45 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     image: null as File | null
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(item.image);
+  const [matchingItemsByName, setMatchingItemsByName] = useState<Pick<Item, 'item_id' | 'name'>[]>([]);
+  const [suggestionNotification, setSuggestionNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    const searchExistingItemsByName = async () => {
+      if (formData.name.trim() === '' || formData.name === item.name) {
+        setMatchingItemsByName([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('item_id, name')
+          .ilike('name', `%${formData.name}%`)
+          .neq('item_id', item.item_id)
+          .eq('item_deleted', false)
+          .limit(5);
+
+        if (error) throw error;
+        setMatchingItemsByName(data || []);
+      } catch (error) {
+        console.error('Error searching existing items by name:', error);
+        setMatchingItemsByName([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchExistingItemsByName();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [formData.name, item.item_id, item.name]);
+
+  const handleSelectSuggestion = (name: string) => {
+    setFormData(prev => ({ ...prev, name: name }));
+    setMatchingItemsByName([]);
+    setSuggestionNotification({ show: true, message: '物品名を入力しました', type: 'success' });
+    setTimeout(() => setSuggestionNotification(null), 3000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +227,14 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full">
+      {suggestionNotification?.show && (
+        <Notification
+          message={suggestionNotification.message}
+          type={suggestionNotification.type}
+          onClose={() => setSuggestionNotification(null)}
+        />
+      )}
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">物品編集</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -260,6 +306,28 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               className="w-full border border-gray-300 rounded-md p-2"
               required
             />
+            {matchingItemsByName.length > 0 && (
+              <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                <h4 className="text-xs font-semibold mb-1 text-gray-600">
+                  既存の物品名候補:
+                </h4>
+                <div className="space-y-1">
+                  {matchingItemsByName.map((match) => (
+                    <div key={match.item_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                      <span className="truncate mr-2">{match.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSuggestion(match.name)}
+                        className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
+                        title="選択"
+                      >
+                        選択
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

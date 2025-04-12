@@ -110,6 +110,45 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: event.name
   });
+  const [matchingEventsByName, setMatchingEventsByName] = useState<Pick<Event, 'event_id' | 'name'>[]>([]);
+  const [suggestionNotification, setSuggestionNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    const searchExistingEventsByName = async () => {
+      if (formData.name.trim() === '' || formData.name === event.name) {
+        setMatchingEventsByName([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('event_id, name')
+          .ilike('name', `%${formData.name}%`)
+          .neq('event_id', event.event_id)
+          .eq('event_deleted', false)
+          .limit(5);
+
+        if (error) throw error;
+        setMatchingEventsByName(data || []);
+      } catch (error) {
+        console.error('Error searching existing events by name:', error);
+        setMatchingEventsByName([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchExistingEventsByName();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [formData.name, event.event_id, event.name]);
+
+  const handleSelectSuggestion = (name: string) => {
+    setFormData(prev => ({ ...prev, name: name }));
+    setMatchingEventsByName([]);
+    setSuggestionNotification({ show: true, message: 'イベント名を入力しました', type: 'success' });
+    setTimeout(() => setSuggestionNotification(null), 3000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +161,13 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {suggestionNotification?.show && (
+        <Notification
+          message={suggestionNotification.message}
+          type={suggestionNotification.type}
+          onClose={() => setSuggestionNotification(null)}
+        />
+      )}
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-1/2">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">イベント編集</h2>
@@ -155,6 +201,28 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
               maxLength={50}
               required
             />
+            {matchingEventsByName.length > 0 && (
+              <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                <h4 className="text-xs font-semibold mb-1 text-gray-600">
+                  既存のイベント名候補:
+                </h4>
+                <div className="space-y-1">
+                  {matchingEventsByName.map((match) => (
+                    <div key={match.event_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                      <span className="truncate mr-2">{match.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSuggestion(match.name)}
+                        className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
+                        title="選択"
+                      >
+                        選択
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-4 pt-4">
@@ -366,9 +434,7 @@ export default function EventsList() {
     return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit'
     });
   };
 

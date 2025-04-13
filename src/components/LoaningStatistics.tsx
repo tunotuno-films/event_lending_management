@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, Package } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData, LegendItem } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -32,16 +32,12 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    // countdown をリセット
     setCountdown(5);
     const timer = setInterval(() => {
       setCountdown((prev) => {
-        // newCount を計算
         const newCount = prev - 1;
-        // 条件を newCount <= 0 に変更
         if (newCount <= 0) {
           clearInterval(timer);
-          // onClose が存在する場合のみ呼び出す
           if (onClose) onClose();
           return 0;
         }
@@ -50,7 +46,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
     }, 1000);
 
     return () => clearInterval(timer);
-    // 依存配列に message を追加
   }, [message, onClose]);
 
   const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
@@ -75,13 +70,12 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
 );
 
 const formatDuration = (seconds: number): string => {
-  if (seconds < 0) return '0時間0分0秒'; // 負の値は0として扱う
+  if (seconds < 0) return '0時間0分0秒';
 
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = Math.floor(seconds % 60);
 
-  // 0秒の場合も考慮
   if (hours === 0 && minutes === 0 && remainingSeconds === 0) {
     return '0時間0分0秒';
   }
@@ -90,7 +84,7 @@ const formatDuration = (seconds: number): string => {
   if (hours > 0) {
     result += `${hours}時間`;
   }
-  if (minutes > 0 || hours > 0) { // 時間がある場合、分が0でも表示
+  if (minutes > 0 || hours > 0) {
     result += `${minutes}分`;
   }
   result += `${remainingSeconds}秒`;
@@ -98,14 +92,13 @@ const formatDuration = (seconds: number): string => {
   return result;
 };
 
-// 色生成関数（HLS色空間を利用して区別しやすい色を生成）
 const generateDistinctColors = (count: number): string[] => {
   const colors: string[] = [];
-  const saturation = 70; // 彩度
-  const lightness = 60; // 明度
+  const saturation = 70;
+  const lightness = 60;
   for (let i = 0; i < count; i++) {
-    const hue = (i * (360 / count)) % 360; // 色相を均等に分散
-    colors.push(`hsla(${hue}, ${saturation}%, ${lightness}%, 0.7)`); // 半透明にする
+    const hue = (i * (360 / count)) % 360;
+    colors.push(`hsla(${hue}, ${saturation}%, ${lightness}%, 0.7)`);
   }
   return colors;
 };
@@ -119,7 +112,6 @@ export default function LoaningStatistics() {
     message: '',
     type: 'success'
   });
-  // sortConfig の初期値を貸出回数の降順に設定
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ItemStatistics | 'item_info';
     direction: 'asc' | 'desc';
@@ -127,6 +119,7 @@ export default function LoaningStatistics() {
   const [mergeByName, setMergeByName] = useState(false);
   const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+  const chartRef = useRef<ChartJS<'bar', number[], string> | null>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -176,6 +169,15 @@ export default function LoaningStatistics() {
 
     return () => clearInterval(intervalId);
   }, [mergeByName, statistics]);
+
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, []);
 
   const fetchEvents = async () => {
     try {
@@ -506,29 +508,82 @@ export default function LoaningStatistics() {
     };
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
     responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        stacked: true,
+        title: {
+          display: true,
+          text: '時間帯',
+        },
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: '貸出回数',
+        },
+      },
+    },
     plugins: {
       legend: {
         position: 'top' as const,
+        labels: {
+          generateLabels: (chart: ChartJS) => {
+            const original = ChartJS.defaults.plugins.legend.labels.generateLabels;
+            const labels = original ? original.call(ChartJS.defaults.plugins.legend.labels, chart) : [];
+            labels.forEach(label => {
+              if (label.hidden) {
+                label.fillStyle = 'rgba(156, 163, 175, 0.7)';
+                label.strokeStyle = 'rgba(156, 163, 175, 0.7)';
+              }
+            });
+            return labels;
+          }
+        },
+        onClick: (e, legendItem: LegendItem, legend) => {
+          const index = legendItem.datasetIndex;
+          const ci = legend.chart;
+          if (index === undefined) return;
+
+          if (e.native && (e.native as MouseEvent).shiftKey) {
+            legend.chart.data.datasets.forEach((_, i) => {
+              if (i !== index) {
+                ci.setDatasetVisibility(i, !ci.isDatasetVisible(i));
+              } else {
+                ci.setDatasetVisibility(i, true);
+              }
+            });
+          } else {
+            ci.setDatasetVisibility(index, !ci.isDatasetVisible(index));
+          }
+          ci.update();
+        }
       },
       title: {
         display: true,
-        text: '貸出回数の時間帯別分布',
+        text: '貸出回数の時間帯別分布 (積み上げ)',
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
       },
     },
-  };
+  }), []);
 
-  const chartData = useMemo(() => {
+  const chartData: ChartData<'bar', number[], string> = useMemo(() => {
     const labels = HOURS;
-    // データセットの数に基づいて色を生成
     const colors = generateDistinctColors(sortedDisplayStatistics.length);
 
     const datasets = sortedDisplayStatistics.map((stat, index) => ({
       label: stat.item_name,
       data: stat.hourly_usage,
-      // 生成した色を順番に割り当てる
       backgroundColor: colors[index % colors.length],
+      borderColor: colors[index % colors.length].replace('0.7', '1'),
+      borderWidth: 1,
     }));
 
     return { labels, datasets };
@@ -857,7 +912,9 @@ export default function LoaningStatistics() {
 
           <div className="mt-8">
             <h3 className="text-lg font-semibold mb-4">貸出回数の時間帯別分布</h3>
-            <Bar options={chartOptions} data={chartData} />
+            <div className="relative h-96"> 
+              <Bar ref={chartRef} options={chartOptions} data={chartData} />
+            </div>
           </div>
         </>
       )}

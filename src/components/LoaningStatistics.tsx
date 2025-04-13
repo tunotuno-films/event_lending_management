@@ -912,7 +912,7 @@ export default function LoaningStatistics() {
 
           <div className="mt-8">
             <h3 className="text-lg font-semibold mb-4">貸出回数の時間帯別分布</h3>
-            <div className="relative h-96"> 
+            <div className="relative h-[700px]">
               <Bar ref={chartRef} options={chartOptions} data={chartData} />
             </div>
           </div>

@@ -638,9 +638,13 @@ export default function LoaningControl() {
                       {matchingItems.map((item) => {
                         const imageUrl = item.items?.image;
                         const itemName = item.items?.name || '不明な物品';
+                        const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明';
+                        const isLoaned = item.status;
+
                         return (
                           <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                             <div className="flex items-center gap-2 overflow-hidden mr-2">
+                              {/* 画像表示 */}
                               <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
                                 {imageUrl && imageUrl.trim() !== '' ? (
                                   <img
@@ -654,7 +658,24 @@ export default function LoaningControl() {
                                   </div>
                                 )}
                               </div>
+                              {/* 物品IDと名前表示を追加 */}
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-xs font-mono text-gray-700 truncate">{itemIdDisplay}</span>
+                                <span className="text-xs text-gray-500 truncate">{itemName}</span>
+                              </div>
                             </div>
+                            {/* 貸出/返却ボタンを追加 */}
+                            <button
+                              onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
+                              disabled={isProcessing}
+                              className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
+                                isLoaned
+                                  ? 'bg-yellow-500 hover:bg-yellow-600'
+                                  : 'bg-blue-500 hover:bg-blue-600'
+                              }`}
+                            >
+                              {isLoaned ? '返却' : '貸出'}
+                            </button>
                           </div>
                         );
                       })}

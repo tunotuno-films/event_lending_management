@@ -137,6 +137,13 @@ export default function LoaningControl() {
   }, [showBarcodeModal]);
 
   useEffect(() => {
+    if (showItemIdModal) {
+      setBarcodeInput('');
+      setMatchingItems([]);
+    }
+  }, [showItemIdModal]);
+
+  useEffect(() => {
     if (isScanning && showCamera) {
       setBarcodeInput('');
       setMatchingItems([]);

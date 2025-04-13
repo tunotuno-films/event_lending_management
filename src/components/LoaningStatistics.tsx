@@ -526,6 +526,9 @@ export default function LoaningStatistics() {
           display: true,
           text: '貸出回数',
         },
+        ticks: {
+          stepSize: 1,
+        },
       },
     },
     plugins: {

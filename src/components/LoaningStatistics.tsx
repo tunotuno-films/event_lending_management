@@ -670,47 +670,59 @@ export default function LoaningStatistics() {
     return { firstIndex, lastIndex: validLastIndex };
   }, [totalMinuteUsage]);
 
-  const lineChartOptions: ChartOptions<'line'> = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
+  const lineChartOptions: ChartOptions<'line'> = useMemo(() => {
+    // Calculate the maximum value in the relevant data range
+    const { firstIndex, lastIndex } = dataRange;
+    const dataSlice = (firstIndex !== -1) ? totalMinuteUsage.slice(firstIndex, lastIndex + 1) : [0];
+    const maxDataValue = Math.max(...dataSlice, 0); // Ensure max is at least 0
+
+    // Calculate the y-axis max value, ensuring it's a multiple of 2 and slightly above maxDataValue
+    // If maxDataValue is 0, set max to 2 to show the axis properly with stepSize 2.
+    const yAxisMax = maxDataValue === 0 ? 2 : Math.ceil(maxDataValue / 2) * 2;
+
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: '時間帯 (10分間隔)',
+          },
+          ticks: {
+            autoSkip: true,
+            maxRotation: 90,
+            minRotation: 0,
+          }
+        },
+        y: {
+          beginAtZero: true,
+          max: yAxisMax, // Explicitly set the max value for the Y-axis
+          title: {
+            display: true,
+            text: '合計貸出回数',
+          },
+          ticks: {
+            stepSize: 2, // Keep stepSize at 2
+            precision: 0
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
         title: {
           display: true,
-          text: '時間帯 (10分間隔)',
+          text: '時間帯別の貸出傾向 (イベント全体 - 10分間隔)',
         },
-        ticks: {
-          autoSkip: true,
-          maxRotation: 90,
-          minRotation: 0,
-        }
-      },
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: '合計貸出回数',
-        },
-        ticks: {
-          stepSize: 2, // Change stepSize from 1 to 2
-          precision: 0
+        tooltip: {
+          mode: 'index',
+          intersect: false,
         },
       },
-    },
-    plugins: {
-      legend: {
-        display: false,
-      },
-      title: {
-        display: true,
-        text: '時間帯別の貸出傾向 (イベント全体 - 10分間隔)',
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-      },
-    },
-  }), []);
+    };
+  }, [totalMinuteUsage, dataRange]);
 
   const lineChartData: ChartData<'line', number[], string> = useMemo(() => {
     const { firstIndex, lastIndex } = dataRange;

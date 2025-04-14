@@ -117,6 +117,16 @@ const formatDuration = (seconds: number): string => {
 // Define chart types
 type ChartType = 'loan_count' | 'total_duration' | 'average_duration';
 
+// Define a color palette for the top items chart
+const TOP_ITEM_COLORS = [
+  'rgb(255, 99, 132)',
+  'rgb(54, 162, 235)',
+  'rgb(255, 206, 86)',
+  'rgb(75, 192, 192)',
+  'rgb(153, 102, 255)',
+  'rgb(255, 159, 64)',
+];
+
 export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -754,6 +764,144 @@ export default function LoaningStatistics() {
     return { labels, datasets };
   }, [totalMinuteUsage, dataRange]);
 
+  const topItemsHourlyUsage = useMemo(() => {
+    const topN = 5;
+    const topItems = [...sortedDisplayStatistics]
+      .sort((a, b) => b.loan_count - a.loan_count)
+      .slice(0, topN);
+
+    const usageData = new Map<string, number[]>();
+    const itemIdentifierKey = mergeByName ? 'item_name' : 'item_id';
+
+    topItems.forEach(item => {
+      const identifier = item[itemIdentifierKey];
+      usageData.set(identifier, new Array(24 * 6).fill(0));
+    });
+
+    loanRecords.forEach(record => {
+      const itemIdentifier = mergeByName
+        ? record.item?.name
+        : record.item_id;
+
+      if (itemIdentifier && usageData.has(itemIdentifier)) {
+        if (record.start_datetime) {
+          try {
+            const startDate = new Date(record.start_datetime);
+            const hour = startDate.getHours();
+            const minute = startDate.getMinutes();
+            const intervalIndex = hour * 6 + Math.floor(minute / 10);
+            if (intervalIndex >= 0 && intervalIndex < 24 * 6) {
+              const currentUsage = usageData.get(itemIdentifier);
+              if (currentUsage) {
+                currentUsage[intervalIndex]++;
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing start_datetime for top item:", record.start_datetime, e);
+          }
+        }
+      }
+    });
+
+    return { usageData, topItems };
+  }, [sortedDisplayStatistics, loanRecords, mergeByName]);
+
+  const topItemsDataRange = useMemo(() => {
+    let firstIndex = -1;
+    let lastIndex = -1;
+
+    topItemsHourlyUsage.usageData.forEach(usageArray => {
+      const first = usageArray.findIndex(count => count > 0);
+      if (first !== -1) {
+        if (firstIndex === -1 || first < firstIndex) {
+          firstIndex = first;
+        }
+      }
+      for (let i = usageArray.length - 1; i >= 0; i--) {
+        if (usageArray[i] > 0) {
+          if (lastIndex === -1 || i > lastIndex) {
+            lastIndex = i;
+          }
+          break;
+        }
+      }
+    });
+
+    const validLastIndex = (lastIndex >= firstIndex) ? lastIndex : firstIndex;
+    return { firstIndex, lastIndex: validLastIndex };
+  }, [topItemsHourlyUsage.usageData]);
+
+  const topItemsLineChartOptions: ChartOptions<'line'> = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: '時間帯 (10分間隔)',
+        },
+        ticks: {
+          autoSkip: true,
+          maxRotation: 90,
+          minRotation: 0,
+        }
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: '物品別 貸出回数',
+        },
+        ticks: {
+          precision: 0,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: '人気車両の時間帯別貸出傾向 (上位5件 - 10分間隔)',
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+      },
+    },
+  }), []);
+
+  const topItemsLineChartData: ChartData<'line', number[], string> = useMemo(() => {
+    const { firstIndex, lastIndex } = topItemsDataRange;
+    const { usageData, topItems } = topItemsHourlyUsage;
+
+    if (firstIndex === -1 || topItems.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    const labels = generateMinuteLabels(firstIndex, lastIndex);
+    const datasets = topItems.map((item, index) => {
+      const itemIdentifierKey = mergeByName ? 'item_name' : 'item_id';
+      const identifier = item[itemIdentifierKey];
+      const itemUsage = usageData.get(identifier) || [];
+      const data = itemUsage.slice(firstIndex, lastIndex + 1);
+      const color = TOP_ITEM_COLORS[index % TOP_ITEM_COLORS.length];
+
+      return {
+        label: item.item_name,
+        data: data,
+        borderColor: color,
+        backgroundColor: `${color.slice(0, -1)}, 0.5)`,
+        tension: 0.1,
+        fill: false,
+      };
+    });
+
+    return { labels, datasets };
+  }, [topItemsHourlyUsage, topItemsDataRange, mergeByName]);
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       {notification.show && (
@@ -1101,6 +1249,19 @@ export default function LoaningStatistics() {
               ) : (
                 <div className="text-center text-gray-500 py-8">
                   このイベントの貸出データはありません。
+                </div>
+              )}
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-lg font-semibold mb-4">人気車両の時間帯別貸出傾向 (上位5件 - 10分間隔)</h3>
+              {topItemsLineChartData.labels && topItemsLineChartData.labels.length > 0 ? (
+                <div className="relative h-96">
+                  <Line options={topItemsLineChartOptions} data={topItemsLineChartData} />
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  人気車両の貸出データが十分にないか、集計中です。
                 </div>
               )}
             </div>

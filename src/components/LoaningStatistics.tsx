@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, Package } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData, LegendItem } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -92,16 +92,8 @@ const formatDuration = (seconds: number): string => {
   return result;
 };
 
-const generateDistinctColors = (count: number): string[] => {
-  const colors: string[] = [];
-  const saturation = 70;
-  const lightness = 60;
-  for (let i = 0; i < count; i++) {
-    const hue = (i * (360 / count)) % 360;
-    colors.push(`hsla(${hue}, ${saturation}%, ${lightness}%, 0.7)`);
-  }
-  return colors;
-};
+// Define chart types
+type ChartType = 'loan_count' | 'total_duration' | 'average_duration';
 
 export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -120,6 +112,8 @@ export default function LoaningStatistics() {
   const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
   const chartRef = useRef<ChartJS<'bar', number[], string> | null>(null);
+  // Add state for selected chart type
+  const [chartType, setChartType] = useState<ChartType>('loan_count');
 
   useEffect(() => {
     const handleResize = () => {
@@ -508,89 +502,118 @@ export default function LoaningStatistics() {
     };
   };
 
-  const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        stacked: true,
+  // Modify chartOptions to be dynamic based on chartType and make it horizontal
+  const chartOptions: ChartOptions<'bar'> = useMemo(() => {
+    let xAxisTitle = '';
+    let chartTitle = '';
+
+    switch (chartType) {
+      case 'loan_count':
+        xAxisTitle = '貸出回数';
+        chartTitle = '人気車両ランキング (貸出回数)';
+        break;
+      case 'total_duration':
+        xAxisTitle = '総貸出時間 (秒)';
+        chartTitle = '人気車両ランキング (総貸出時間)';
+        break;
+      case 'average_duration':
+        xAxisTitle = '平均貸出時間 (秒)';
+        chartTitle = '人気車両ランキング (平均貸出時間)';
+        break;
+    }
+
+    return {
+      indexAxis: 'y' as const, // Make it a horizontal bar chart
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: xAxisTitle,
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: '物品名',
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: false, // Hide legend for single dataset charts
+        },
         title: {
           display: true,
-          text: '時間帯',
+          text: chartTitle,
         },
-      },
-      y: {
-        stacked: true,
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: '貸出回数',
-        },
-        ticks: {
-          stepSize: 1,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: {
-          generateLabels: (chart: ChartJS) => {
-            const original = ChartJS.defaults.plugins.legend.labels.generateLabels;
-            const labels = original ? original.call(ChartJS.defaults.plugins.legend.labels, chart) : [];
-            labels.forEach(label => {
-              if (label.hidden) {
-                label.fillStyle = 'rgba(156, 163, 175, 0.7)';
-                label.strokeStyle = 'rgba(156, 163, 175, 0.7)';
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
               }
-            });
-            return labels;
+              if (context.parsed.x !== null) {
+                if (chartType === 'total_duration' || chartType === 'average_duration') {
+                   label += formatDuration(context.parsed.x); // Format duration for tooltip
+                } else {
+                   label += context.parsed.x;
+                }
+              }
+              return label;
+            }
           }
         },
-        onClick: (e, legendItem: LegendItem, legend) => {
-          const index = legendItem.datasetIndex;
-          const ci = legend.chart;
-          if (index === undefined) return;
+      },
+    };
+  }, [chartType]); // Add chartType as dependency
 
-          if (e.native && (e.native as MouseEvent).shiftKey) {
-            legend.chart.data.datasets.forEach((_, i) => {
-              if (i !== index) {
-                ci.setDatasetVisibility(i, !ci.isDatasetVisible(i));
-              } else {
-                ci.setDatasetVisibility(i, true);
-              }
-            });
-          } else {
-            ci.setDatasetVisibility(index, !ci.isDatasetVisible(index));
-          }
-          ci.update();
-        }
-      },
-      title: {
-        display: true,
-        text: '貸出回数の時間帯別分布 (積み上げ)',
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-      },
-    },
-  }), []);
-
+  // Modify chartData generation based on chartType
   const chartData: ChartData<'bar', number[], string> = useMemo(() => {
-    const labels = HOURS;
-    const colors = generateDistinctColors(sortedDisplayStatistics.length);
+    // Sort data based on the selected chart type
+    const sortedData = [...sortedDisplayStatistics].sort((a, b) => {
+      const aValue = a[chartType];
+      const bValue = b[chartType];
+      // Handle potential non-numeric values if necessary, though these should be numbers
+      const numA = typeof aValue === 'number' ? aValue : 0;
+      const numB = typeof bValue === 'number' ? bValue : 0;
+      return numB - numA; // Sort descending
+    });
 
-    const datasets = sortedDisplayStatistics.map((stat, index) => ({
-      label: stat.item_name,
-      data: stat.hourly_usage,
-      backgroundColor: colors[index % colors.length],
-      borderColor: colors[index % colors.length].replace('0.7', '1'),
+    const labels = sortedData.map(stat => stat.item_name);
+    const dataValues = sortedData.map(stat => {
+        const value = stat[chartType];
+        return typeof value === 'number' ? value : 0; // Ensure data is numeric
+    });
+
+    let datasetLabel = '';
+     switch (chartType) {
+      case 'loan_count':
+        datasetLabel = '貸出回数';
+        break;
+      case 'total_duration':
+        datasetLabel = '総貸出時間';
+        break;
+      case 'average_duration':
+        datasetLabel = '平均貸出時間';
+        break;
+    }
+
+    const datasets = [{
+      label: datasetLabel,
+      data: dataValues,
+      backgroundColor: 'rgba(59, 130, 246, 0.7)', // Single color
+      borderColor: 'rgba(59, 130, 246, 1)',
       borderWidth: 1,
-    }));
+    }];
 
     return { labels, datasets };
-  }, [sortedDisplayStatistics]);
+  }, [sortedDisplayStatistics, chartType]); // Add chartType as dependency
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -914,8 +937,21 @@ export default function LoaningStatistics() {
           </div>
 
           <div className="mt-8">
-            <h3 className="text-lg font-semibold mb-4">貸出回数の時間帯別分布</h3>
-            <div className="relative h-[700px]">
+            {/* Add chart type selector */}
+            <div className="mb-4 flex items-center gap-4">
+               <h3 className="text-lg font-semibold">人気車両ランキング</h3>
+               <select
+                 value={chartType}
+                 onChange={(e) => setChartType(e.target.value as ChartType)}
+                 className="border border-gray-300 rounded-md p-2"
+               >
+                 <option value="loan_count">貸出回数</option>
+                 <option value="total_duration">総貸出時間</option>
+                 <option value="average_duration">平均貸出時間</option>
+               </select>
+            </div>
+            {/* Adjust height for horizontal bar chart, e.g., h-[1000px] or dynamic */}
+            <div className="relative h-[1000px]">
               <Bar ref={chartRef} options={chartOptions} data={chartData} />
             </div>
           </div>

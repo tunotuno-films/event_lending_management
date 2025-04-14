@@ -703,7 +703,17 @@ export default function LoaningStatistics() {
           },
           ticks: {
             stepSize: 2, // Keep stepSize at 2
-            precision: 0
+            precision: 0,
+            // Add callback to filter ticks
+            callback: function(value) {
+              // Ensure value is treated as a number
+              const numericValue = typeof value === 'string' ? parseFloat(value) : value;
+              // Show only even numbers (multiples of 2)
+              if (numericValue % 2 === 0) {
+                return numericValue;
+              }
+              return undefined; // Hide odd numbers
+            }
           },
         },
       },

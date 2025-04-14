@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, Package } from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
 
 interface Event {
   event_id: string;
@@ -112,7 +112,6 @@ export default function LoaningStatistics() {
   const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
   const chartRef = useRef<ChartJS<'bar', number[], string> | null>(null);
-  // Add state for selected chart type
   const [chartType, setChartType] = useState<ChartType>('loan_count');
 
   useEffect(() => {
@@ -502,7 +501,6 @@ export default function LoaningStatistics() {
     };
   };
 
-  // Modify chartOptions to be dynamic based on chartType and make it horizontal
   const chartOptions: ChartOptions<'bar'> = useMemo(() => {
     let xAxisTitle = '';
     let chartTitle = '';
@@ -523,7 +521,7 @@ export default function LoaningStatistics() {
     }
 
     return {
-      indexAxis: 'y' as const, // Make it a horizontal bar chart
+      indexAxis: 'y' as const,
       responsive: true,
       maintainAspectRatio: false,
       scales: {
@@ -543,7 +541,7 @@ export default function LoaningStatistics() {
       },
       plugins: {
         legend: {
-          display: false, // Hide legend for single dataset charts
+          display: false,
         },
         title: {
           display: true,
@@ -560,7 +558,7 @@ export default function LoaningStatistics() {
               }
               if (context.parsed.x !== null) {
                 if (chartType === 'total_duration' || chartType === 'average_duration') {
-                   label += formatDuration(context.parsed.x); // Format duration for tooltip
+                   label += formatDuration(context.parsed.x);
                 } else {
                    label += context.parsed.x;
                 }
@@ -571,24 +569,21 @@ export default function LoaningStatistics() {
         },
       },
     };
-  }, [chartType]); // Add chartType as dependency
+  }, [chartType]);
 
-  // Modify chartData generation based on chartType
   const chartData: ChartData<'bar', number[], string> = useMemo(() => {
-    // Sort data based on the selected chart type
     const sortedData = [...sortedDisplayStatistics].sort((a, b) => {
       const aValue = a[chartType];
       const bValue = b[chartType];
-      // Handle potential non-numeric values if necessary, though these should be numbers
       const numA = typeof aValue === 'number' ? aValue : 0;
       const numB = typeof bValue === 'number' ? bValue : 0;
-      return numB - numA; // Sort descending
+      return numB - numA;
     });
 
     const labels = sortedData.map(stat => stat.item_name);
     const dataValues = sortedData.map(stat => {
         const value = stat[chartType];
-        return typeof value === 'number' ? value : 0; // Ensure data is numeric
+        return typeof value === 'number' ? value : 0;
     });
 
     let datasetLabel = '';
@@ -607,13 +602,72 @@ export default function LoaningStatistics() {
     const datasets = [{
       label: datasetLabel,
       data: dataValues,
-      backgroundColor: 'rgba(59, 130, 246, 0.7)', // Single color
+      backgroundColor: 'rgba(59, 130, 246, 0.7)',
       borderColor: 'rgba(59, 130, 246, 1)',
       borderWidth: 1,
     }];
 
     return { labels, datasets };
-  }, [sortedDisplayStatistics, chartType]); // Add chartType as dependency
+  }, [sortedDisplayStatistics, chartType]);
+
+  const totalHourlyUsage = useMemo(() => {
+    const totals = new Array(24).fill(0);
+    sortedDisplayStatistics.forEach(stat => {
+      stat.hourly_usage.forEach((count, hour) => {
+        totals[hour] += count;
+      });
+    });
+    return totals;
+  }, [sortedDisplayStatistics]);
+
+  const lineChartOptions: ChartOptions<'line'> = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: '時間帯',
+        },
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: '合計貸出回数',
+        },
+        ticks: {
+          stepSize: 1,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: true,
+        text: '時間帯別の貸出傾向 (イベント全体)',
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+      },
+    },
+  }), []);
+
+  const lineChartData: ChartData<'line', number[], string> = useMemo(() => {
+    const labels = HOURS;
+    const datasets = [{
+      label: '合計貸出回数',
+      data: totalHourlyUsage,
+      borderColor: 'rgb(75, 192, 192)',
+      backgroundColor: 'rgba(75, 192, 192, 0.5)',
+      tension: 0.1,
+      fill: false,
+    }];
+    return { labels, datasets };
+  }, [totalHourlyUsage]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -937,7 +991,6 @@ export default function LoaningStatistics() {
           </div>
 
           <div className="mt-8">
-            {/* Add chart type selector */}
             <div className="mb-4 flex items-center gap-4">
                <h3 className="text-lg font-semibold">人気車両ランキング</h3>
                <select
@@ -950,9 +1003,15 @@ export default function LoaningStatistics() {
                  <option value="average_duration">平均貸出時間</option>
                </select>
             </div>
-            {/* Adjust height for horizontal bar chart, e.g., h-[1000px] or dynamic */}
-            <div className="relative h-[1000px]">
+            <div className="relative h-[1000px] mb-12">
               <Bar ref={chartRef} options={chartOptions} data={chartData} />
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体)</h3>
+              <div className="relative h-96">
+                <Line options={lineChartOptions} data={lineChartData} />
+              </div>
             </div>
           </div>
         </>

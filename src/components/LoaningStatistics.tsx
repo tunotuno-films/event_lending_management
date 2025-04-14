@@ -676,9 +676,8 @@ export default function LoaningStatistics() {
     const dataSlice = (firstIndex !== -1) ? totalMinuteUsage.slice(firstIndex, lastIndex + 1) : [0];
     const maxDataValue = Math.max(...dataSlice, 0); // Ensure max is at least 0
 
-    // Calculate the y-axis max value, ensuring it's a multiple of 2 and slightly above maxDataValue
-    // If maxDataValue is 0, set max to 2 to show the axis properly with stepSize 2.
-    const yAxisMax = maxDataValue === 0 ? 2 : Math.ceil(maxDataValue / 2) * 2;
+    // Calculate the suggested y-axis max value
+    const yAxisSuggestedMax = maxDataValue === 0 ? 2 : Math.ceil(maxDataValue / 2) * 2;
 
     return {
       responsive: true,
@@ -697,7 +696,7 @@ export default function LoaningStatistics() {
         },
         y: {
           beginAtZero: true,
-          max: yAxisMax, // Explicitly set the max value for the Y-axis
+          suggestedMax: yAxisSuggestedMax, // Use suggestedMax instead of max
           title: {
             display: true,
             text: '合計貸出回数',

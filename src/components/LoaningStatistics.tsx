@@ -92,26 +92,33 @@ const generateMinuteLabels = (startIndex: number, endIndex: number): string[] =>
 };
 
 const formatDuration = (seconds: number): string => {
-  if (seconds < 0) return '0時間0分0秒';
+  if (seconds < 0) return '0秒'; // 0秒未満は0秒と表示
 
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
+  const totalSeconds = Math.round(seconds); // 秒数を整数に丸める
 
-  if (hours === 0 && minutes === 0 && remainingSeconds === 0) {
-    return '0時間0分0秒';
+  if (totalSeconds === 0) {
+    return '0秒';
   }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
 
   let result = '';
   if (hours > 0) {
     result += `${hours}時間`;
   }
-  if (minutes > 0 || hours > 0) {
+  if (minutes > 0) {
+    // 時間が表示されている場合、または分が0より大きい場合に分を追加
     result += `${minutes}分`;
   }
-  result += `${remainingSeconds}秒`;
+  // 秒が0より大きい場合、または時間がなく分もない場合に秒を追加 (例: 30秒)
+  if (remainingSeconds > 0 || (hours === 0 && minutes === 0)) {
+    result += `${remainingSeconds}秒`;
+  }
 
-  return result;
+  // 結果が空の場合は "0秒" を返す (念のため)
+  return result || '0秒';
 };
 
 // Define chart types

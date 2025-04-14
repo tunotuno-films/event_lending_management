@@ -569,6 +569,25 @@ export default function LoaningStatistics() {
             display: true,
             text: xAxisTitle,
           },
+          ticks: {
+            callback: function(value) {
+              if (chartType === 'total_duration' || chartType === 'average_duration') {
+                const numericValue = typeof value === 'string' ? parseFloat(value) : value;
+                if (typeof numericValue === 'number' && Number.isFinite(numericValue)) {
+                  const totalSeconds = Math.round(numericValue);
+                  const minutes = Math.floor(totalSeconds / 60);
+                  const seconds = totalSeconds % 60;
+                  if (minutes > 0) {
+                    return `${minutes}分${seconds}秒`;
+                  } else {
+                    return `${seconds}秒`;
+                  }
+                }
+                return value;
+              }
+              return value;
+            }
+          }
         },
         y: {
           title: {

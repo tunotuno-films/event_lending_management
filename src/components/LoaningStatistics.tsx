@@ -11,6 +11,18 @@ interface Event {
   name: string;
 }
 
+interface LoanRecord {
+  result_id: number;
+  event_id: string;
+  item_id: string;
+  start_datetime: string;
+  end_datetime: string | null;
+  item?: {
+    name: string;
+    image: string;
+  };
+}
+
 interface ItemStatistics {
   item_id: string;
   item_name: string;
@@ -69,6 +81,16 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   `${i.toString().padStart(2, '0')}:00`
 );
 
+const generateMinuteLabels = (startIndex: number, endIndex: number): string[] => {
+  const labels: string[] = [];
+  for (let i = startIndex; i <= endIndex; i++) {
+    const hour = Math.floor(i / 6);
+    const minute = (i % 6) * 10;
+    labels.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+  }
+  return labels;
+};
+
 const formatDuration = (seconds: number): string => {
   if (seconds < 0) return '0時間0分0秒';
 
@@ -99,6 +121,7 @@ export default function LoaningStatistics() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [statistics, setStatistics] = useState<ItemStatistics[]>([]);
+  const [loanRecords, setLoanRecords] = useState<LoanRecord[]>([]);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
     show: false,
     message: '',
@@ -201,7 +224,7 @@ export default function LoaningStatistics() {
 
   const fetchStatistics = async () => {
     try {
-      const { data: loanRecords, error: loanError } = await supabase
+      const { data: fetchedLoanRecords, error: loanError } = await supabase
         .from('result')
         .select(`
           *,
@@ -211,14 +234,16 @@ export default function LoaningStatistics() {
 
       if (loanError) throw loanError;
 
-      if (!loanRecords) {
+      setLoanRecords(fetchedLoanRecords || []);
+
+      if (!fetchedLoanRecords) {
         setStatistics([]);
         return;
       }
 
       const itemStats = new Map<string, ItemStatistics>();
 
-      loanRecords.forEach(record => {
+      fetchedLoanRecords.forEach(record => {
         const itemName = record.item?.name;
         const itemImage = record.item?.image;
 
@@ -272,6 +297,8 @@ export default function LoaningStatistics() {
         message: '統計データの取得中にエラーが発生しました',
         type: 'error'
       });
+      setLoanRecords([]);
+      setStatistics([]);
     }
   };
 
@@ -610,15 +637,38 @@ export default function LoaningStatistics() {
     return { labels, datasets };
   }, [sortedDisplayStatistics, chartType]);
 
-  const totalHourlyUsage = useMemo(() => {
-    const totals = new Array(24).fill(0);
-    sortedDisplayStatistics.forEach(stat => {
-      stat.hourly_usage.forEach((count, hour) => {
-        totals[hour] += count;
-      });
+  const totalMinuteUsage = useMemo(() => {
+    const totals = new Array(24 * 6).fill(0);
+    loanRecords.forEach(record => {
+      if (record.start_datetime) {
+        try {
+          const startDate = new Date(record.start_datetime);
+          const hour = startDate.getHours();
+          const minute = startDate.getMinutes();
+          const intervalIndex = hour * 6 + Math.floor(minute / 10);
+          if (intervalIndex >= 0 && intervalIndex < totals.length) {
+            totals[intervalIndex]++;
+          }
+        } catch (e) {
+          console.error("Error parsing start_datetime:", record.start_datetime, e);
+        }
+      }
     });
     return totals;
-  }, [sortedDisplayStatistics]);
+  }, [loanRecords]);
+
+  const dataRange = useMemo(() => {
+    const firstIndex = totalMinuteUsage.findIndex(count => count > 0);
+    let lastIndex = -1;
+    for (let i = totalMinuteUsage.length - 1; i >= 0; i--) {
+      if (totalMinuteUsage[i] > 0) {
+        lastIndex = i;
+        break;
+      }
+    }
+    const validLastIndex = (lastIndex >= firstIndex) ? lastIndex : firstIndex;
+    return { firstIndex, lastIndex: validLastIndex };
+  }, [totalMinuteUsage]);
 
   const lineChartOptions: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
@@ -627,8 +677,13 @@ export default function LoaningStatistics() {
       x: {
         title: {
           display: true,
-          text: '時間帯',
+          text: '時間帯 (10分間隔)',
         },
+        ticks: {
+          autoSkip: true,
+          maxRotation: 90,
+          minRotation: 0,
+        }
       },
       y: {
         beginAtZero: true,
@@ -638,6 +693,7 @@ export default function LoaningStatistics() {
         },
         ticks: {
           stepSize: 1,
+          precision: 0
         },
       },
     },
@@ -647,7 +703,7 @@ export default function LoaningStatistics() {
       },
       title: {
         display: true,
-        text: '時間帯別の貸出傾向 (イベント全体)',
+        text: '時間帯別の貸出傾向 (イベント全体 - 10分間隔)',
       },
       tooltip: {
         mode: 'index',
@@ -657,17 +713,25 @@ export default function LoaningStatistics() {
   }), []);
 
   const lineChartData: ChartData<'line', number[], string> = useMemo(() => {
-    const labels = HOURS;
+    const { firstIndex, lastIndex } = dataRange;
+
+    if (firstIndex === -1) {
+      return { labels: [], datasets: [] };
+    }
+
+    const labels = generateMinuteLabels(firstIndex, lastIndex);
+    const data = totalMinuteUsage.slice(firstIndex, lastIndex + 1);
+
     const datasets = [{
       label: '合計貸出回数',
-      data: totalHourlyUsage,
+      data: data,
       borderColor: 'rgb(75, 192, 192)',
       backgroundColor: 'rgba(75, 192, 192, 0.5)',
       tension: 0.1,
       fill: false,
     }];
     return { labels, datasets };
-  }, [totalHourlyUsage]);
+  }, [totalMinuteUsage, dataRange]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -1008,10 +1072,16 @@ export default function LoaningStatistics() {
             </div>
 
             <div className="mt-12">
-              <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体)</h3>
-              <div className="relative h-96">
-                <Line options={lineChartOptions} data={lineChartData} />
-              </div>
+              <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体 - 10分間隔)</h3>
+              {lineChartData.labels && lineChartData.labels.length > 0 ? (
+                <div className="relative h-96">
+                  <Line options={lineChartOptions} data={lineChartData} />
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  このイベントの貸出データはありません。
+                </div>
+              )}
             </div>
           </div>
         </>

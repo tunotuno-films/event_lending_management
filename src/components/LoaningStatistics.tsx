@@ -692,7 +692,7 @@ export default function LoaningStatistics() {
           text: '合計貸出回数',
         },
         ticks: {
-          stepSize: 1,
+          stepSize: 2, // Change stepSize from 1 to 2
           precision: 0
         },
       },

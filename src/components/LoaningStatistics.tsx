@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, X, Download, Package } from 'lucide-react';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Line, Scatter } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
@@ -116,8 +116,8 @@ const formatDuration = (seconds: number): string => {
 
 // Define chart types
 type ChartType = 'loan_count' | 'total_duration' | 'average_duration';
+type ScatterYAxisType = 'total_duration' | 'average_duration';
 
-// Define a color palette for the top items chart
 const TOP_ITEM_COLORS = [
   'rgb(255, 99, 132)',
   'rgb(54, 162, 235)',
@@ -146,6 +146,7 @@ export default function LoaningStatistics() {
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
   const chartRef = useRef<ChartJS<'bar', number[], string> | null>(null);
   const [chartType, setChartType] = useState<ChartType>('loan_count');
+  const [scatterYAxisType, setScatterYAxisType] = useState<ScatterYAxisType>('total_duration');
 
   useEffect(() => {
     const handleResize = () => {
@@ -681,12 +682,10 @@ export default function LoaningStatistics() {
   }, [totalMinuteUsage]);
 
   const lineChartOptions: ChartOptions<'line'> = useMemo(() => {
-    // Calculate the maximum value in the relevant data range
     const { firstIndex, lastIndex } = dataRange;
     const dataSlice = (firstIndex !== -1) ? totalMinuteUsage.slice(firstIndex, lastIndex + 1) : [0];
-    const maxDataValue = Math.max(...dataSlice, 0); // Ensure max is at least 0
+    const maxDataValue = Math.max(...dataSlice, 0);
 
-    // Calculate the suggested y-axis max value
     const yAxisSuggestedMax = maxDataValue === 0 ? 2 : Math.ceil(maxDataValue / 2) * 2;
 
     return {
@@ -706,23 +705,20 @@ export default function LoaningStatistics() {
         },
         y: {
           beginAtZero: true,
-          suggestedMax: yAxisSuggestedMax, // Use suggestedMax instead of max
+          suggestedMax: yAxisSuggestedMax,
           title: {
             display: true,
             text: '合計貸出回数',
           },
           ticks: {
-            stepSize: 2, // Keep stepSize at 2
+            stepSize: 2,
             precision: 0,
-            // Add callback to filter ticks
             callback: function(value) {
-              // Ensure value is treated as a number
               const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-              // Show only even numbers (multiples of 2)
               if (numericValue % 2 === 0) {
                 return numericValue;
               }
-              return undefined; // Hide odd numbers
+              return undefined;
             }
           },
         },
@@ -901,6 +897,78 @@ export default function LoaningStatistics() {
 
     return { labels, datasets };
   }, [topItemsHourlyUsage, topItemsDataRange, mergeByName]);
+
+  const scatterChartData: ChartData<'scatter', { x: number; y: number; label: string }[], string> = useMemo(() => {
+    const dataPoints = sortedDisplayStatistics.map(stat => ({
+      x: stat.loan_count,
+      y: stat[scatterYAxisType],
+      label: stat.item_name
+    }));
+
+    return {
+      datasets: [{
+        label: `貸出回数 vs ${scatterYAxisType === 'total_duration' ? '総貸出時間' : '平均貸出時間'}`,
+        data: dataPoints,
+        backgroundColor: 'rgba(153, 102, 255, 0.6)',
+        borderColor: 'rgba(153, 102, 255, 1)',
+      }]
+    };
+  }, [sortedDisplayStatistics, scatterYAxisType]);
+
+  const scatterChartOptions: ChartOptions<'scatter'> = useMemo(() => {
+    const yAxisLabel = scatterYAxisType === 'total_duration' ? '総貸出時間 (秒)' : '平均貸出時間 (秒)';
+    const chartTitle = `貸出回数と${scatterYAxisType === 'total_duration' ? '総貸出時間' : '平均貸出時間'}の関係`;
+
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: 'linear',
+          position: 'bottom',
+          title: {
+            display: true,
+            text: '貸出回数',
+          },
+          beginAtZero: true,
+        },
+        y: {
+          type: 'linear',
+          title: {
+            display: true,
+            text: yAxisLabel,
+          },
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              if (typeof value === 'number') {
+                return formatDuration(value);
+              }
+              return value;
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        title: {
+          display: true,
+          text: chartTitle,
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const point = context.raw as { x: number; y: number; label: string };
+              const yLabel = scatterYAxisType === 'total_duration' ? '総時間' : '平均時間';
+              return `${point.label}: (${point.x}回, ${yLabel}: ${formatDuration(point.y)})`;
+            }
+          }
+        }
+      }
+    };
+  }, [scatterYAxisType]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -1262,6 +1330,44 @@ export default function LoaningStatistics() {
               ) : (
                 <div className="text-center text-gray-500 py-8">
                   人気車両の貸出データが十分にないか、集計中です。
+                </div>
+              )}
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-lg font-semibold mb-4">貸出回数と貸出時間の関係</h3>
+              <div className="mb-4 flex items-center gap-4">
+                <span className="text-sm font-medium text-gray-700">Y軸:</span>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scatterYAxis"
+                    value="total_duration"
+                    checked={scatterYAxisType === 'total_duration'}
+                    onChange={() => setScatterYAxisType('total_duration')}
+                    className="form-radio h-4 w-4 text-blue-600"
+                  />
+                  <span className="text-sm">総貸出時間</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scatterYAxis"
+                    value="average_duration"
+                    checked={scatterYAxisType === 'average_duration'}
+                    onChange={() => setScatterYAxisType('average_duration')}
+                    className="form-radio h-4 w-4 text-blue-600"
+                  />
+                  <span className="text-sm">平均貸出時間</span>
+                </label>
+              </div>
+              {scatterChartData.datasets[0].data.length > 0 ? (
+                <div className="relative h-96">
+                  <Scatter options={scatterChartOptions} data={scatterChartData} />
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  散布図を表示するためのデータがありません。
                 </div>
               )}
             </div>

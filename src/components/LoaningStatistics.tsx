@@ -148,6 +148,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
     const [animatedIdIndices, setAnimatedIdIndices] = useState<{ [itemName: string]: number }>({});
     const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
     const chartRef = useRef<ChartJS<'bar', number[], string> | null>(null);
+    const lineChartRef = useRef<ChartJS<'line', number[], string> | null>(null); // Add ref for line chart
+    const topItemsLineChartRef = useRef<ChartJS<'line', number[], string> | null>(null); // Add ref for top items line chart
+    const scatterChartRef = useRef<ChartJS<'scatter', { x: number; y: number; label: string }[], string> | null>(null); // Add ref for scatter chart
     const [chartType, setChartType] = useState<ChartType>('loan_count');
     const [scatterYAxisType, setScatterYAxisType] = useState<ScatterYAxisType>('total_duration');
 
@@ -1322,7 +1325,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
                 <option value="average_duration">平均貸出時間</option>
                 </select>
               </div>
-              <button
+                <button
                 onClick={() => {
                 if (chartRef.current) {
                   const link = document.createElement('a');
@@ -1351,81 +1354,196 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
                   document.body.removeChild(link);
                 }
                 }}
-                className="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center gap-1 text-sm"
+                className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
                 title="グラフを画像としてダウンロード"
-              >
+                >
                 <Download size={14} />
-                画像DL
-              </button>
+                画像ダウンロード
+                </button>
               </div>
               <div className="relative h-[1000px] mb-12">
               {/* Ensure the ref is correctly passed to the Bar component */}
               <Bar ref={chartRef} options={chartOptions} data={chartData} />
               </div>
+                <div className="mt-12">
+                <div className="mb-4 flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">時間帯別の貸出傾向 (イベント全体 - 10分間隔)</h3>
+                      <button
+                      onClick={() => {
+                        // Use the ref to get the chart instance
+                        if (lineChartRef.current) {
+                        const link = document.createElement('a');
+                        link.href = lineChartRef.current.toBase64Image(); // Use ref to get image
 
-              <div className="mt-12">
-              <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体 - 10分間隔)</h3>
-              {lineChartData.labels && lineChartData.labels.length > 0 ? (
-                <div className="relative h-96">
-                <Line options={lineChartOptions} data={lineChartData} />
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                このイベントの貸出データはありません。
-                </div>
-              )}
-              </div>
+                        const today = new Date();
+                        const yyyy = today.getFullYear().toString();
+                        const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+                        const dd = today.getDate().toString().padStart(2, '0');
+                        const dateString = `${yyyy}${mm}${dd}`;
+                        const selectedEvent = events.find(e => e.event_id === selectedEventId);
+                        const mergeSuffix = mergeByName ? '_統合' : '';
+                        const chartTypeSuffix = '時間帯別傾向';
+                        const fileName = selectedEvent
+                          ? `${dateString}_${chartTypeSuffix}_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
+                          : `${dateString}_${chartTypeSuffix}${mergeSuffix}.png`;
 
-              <div className="mt-12">
-                <h3 className="text-lg font-semibold mb-4">人気車両の時間帯別貸出傾向 (上位5件 - 10分間隔)</h3>
-                {topItemsLineChartData.labels && topItemsLineChartData.labels.length > 0 ? (
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
+                      title="グラフを画像としてダウンロード"
+                      >
+                      <Download size={14} />
+                      画像ダウンロード
+                      </button>
+                </div>
+                {lineChartData.labels && lineChartData.labels.length > 0 ? (
                   <div className="relative h-96">
-                    <Line options={topItemsLineChartOptions} data={topItemsLineChartData} />
+                  {/* Pass the ref to the Line component */}
+                  <Line ref={lineChartRef} options={lineChartOptions} data={lineChartData} />
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 py-8">
-                    人気車両の貸出データが十分にないか、集計中です。
+                  このイベントの貸出データはありません。
                   </div>
                 )}
-              </div>
+                </div>
 
-              <div className="mt-12">
-                <h3 className="text-lg font-semibold mb-4">貸出回数と貸出時間の関係</h3>
+                <div className="mt-12">
+                <div className="mb-4 flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">人気車両の時間帯別貸出傾向 (上位5件 - 10分間隔)</h3>
+                  <button
+                  onClick={() => {
+                  // Use the ref to get the chart instance
+                  if (topItemsLineChartRef.current) {
+                    const link = document.createElement('a');
+                    link.href = topItemsLineChartRef.current.toBase64Image(); // Use ref to get image
+
+                    const today = new Date();
+                    const yyyy = today.getFullYear().toString();
+                    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+                    const dd = today.getDate().toString().padStart(2, '0');
+                    const dateString = `${yyyy}${mm}${dd}`;
+                    const selectedEvent = events.find(e => e.event_id === selectedEventId);
+                    const mergeSuffix = mergeByName ? '_統合' : '';
+                    const chartTypeSuffix = '人気車両時間帯別傾向';
+                    const fileName = selectedEvent
+                    ? `${dateString}_${chartTypeSuffix}_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
+                    : `${dateString}_${chartTypeSuffix}${mergeSuffix}.png`;
+
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } else {
+                    console.error("Top items line chart ref is not available.");
+                    setNotification({
+                    show: true,
+                    message: 'グラフ画像のダウンロードに失敗しました。',
+                    type: 'error'
+                    });
+                  }
+                  }}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
+                  title="グラフを画像としてダウンロード"
+                  >
+                  <Download size={14} />
+                  画像ダウンロード
+                  </button>
+                </div>
+                {topItemsLineChartData.labels && topItemsLineChartData.labels.length > 0 ? (
+                  <div className="relative h-96">
+                  {/* Pass the ref to the Line component */}
+                  <Line ref={topItemsLineChartRef} options={topItemsLineChartOptions} data={topItemsLineChartData} />
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 py-8">
+                  人気車両の貸出データが十分にないか、集計中です。
+                  </div>
+                )}
+                </div>
+
+                <div className="mt-12">
+                <div className="mb-4 flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">貸出回数と貸出時間の関係</h3>
+                  <button
+                  onClick={() => {
+                  if (scatterChartRef.current) {
+                    const link = document.createElement('a');
+                    link.href = scatterChartRef.current.toBase64Image();
+
+                    const today = new Date();
+                    const yyyy = today.getFullYear().toString();
+                    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+                    const dd = today.getDate().toString().padStart(2, '0');
+                    const dateString = `${yyyy}${mm}${dd}`;
+                    const selectedEvent = events.find(e => e.event_id === selectedEventId);
+                    const mergeSuffix = mergeByName ? '_統合' : '';
+                    const yAxisSuffix = scatterYAxisType === 'total_duration' ? '総時間' : '平均時間';
+                    const chartTypeSuffix = `貸出回数vs${yAxisSuffix}`;
+
+                    const fileName = selectedEvent
+                    ? `${dateString}_${chartTypeSuffix}_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
+                    : `${dateString}_${chartTypeSuffix}${mergeSuffix}.png`;
+
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } else {
+                    console.error("Scatter chart ref is not available.");
+                    setNotification({
+                    show: true,
+                    message: 'グラフ画像のダウンロードに失敗しました。',
+                    type: 'error'
+                    });
+                  }
+                  }}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
+                  title="グラフを画像としてダウンロード"
+                  >
+                  <Download size={14} />
+                  画像ダウンロード
+                  </button>
+                </div>
                 <div className="mb-4 flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700">Y軸:</span>
                   <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scatterYAxis"
-                      value="total_duration"
-                      checked={scatterYAxisType === 'total_duration'}
-                      onChange={() => setScatterYAxisType('total_duration')}
-                      className="form-radio h-4 w-4 text-blue-600"
-                    />
-                    <span className="text-sm">総貸出時間</span>
+                  <input
+                  type="radio"
+                  name="scatterYAxis"
+                  value="total_duration"
+                  checked={scatterYAxisType === 'total_duration'}
+                  onChange={() => setScatterYAxisType('total_duration')}
+                  className="form-radio h-4 w-4 text-blue-600"
+                  />
+                  <span className="text-sm">総貸出時間</span>
                   </label>
                   <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scatterYAxis"
-                      value="average_duration"
-                      checked={scatterYAxisType === 'average_duration'}
-                      onChange={() => setScatterYAxisType('average_duration')}
-                      className="form-radio h-4 w-4 text-blue-600"
-                    />
-                    <span className="text-sm">平均貸出時間</span>
+                  <input
+                  type="radio"
+                  name="scatterYAxis"
+                  value="average_duration"
+                  checked={scatterYAxisType === 'average_duration'}
+                  onChange={() => setScatterYAxisType('average_duration')}
+                  className="form-radio h-4 w-4 text-blue-600"
+                  />
+                  <span className="text-sm">平均貸出時間</span>
                   </label>
                 </div>
                 {scatterChartData.datasets[0].data.length > 0 ? (
                   <div className="relative h-96">
-                    <Scatter options={scatterChartOptions} data={scatterChartData} />
+                  <Scatter ref={scatterChartRef} options={scatterChartOptions} data={scatterChartData} />
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 py-8">
-                    散布図を表示するためのデータがありません。
+                  散布図を表示するためのデータがありません。
                   </div>
                 )}
-              </div>
+                </div>
             </div>
           </>
         )}

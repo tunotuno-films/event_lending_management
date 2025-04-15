@@ -1309,33 +1309,71 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
             </div>
 
             <div className="mt-8">
-              <div className="mb-4 flex items-center gap-4">
+              <div className="mb-4 flex justify-between items-center">
+              <div className="flex items-center gap-4">
                 <h3 className="text-lg font-semibold">人気車両ランキング</h3>
                 <select
-                  value={chartType}
-                  onChange={(e) => setChartType(e.target.value as ChartType)}
-                  className="border border-gray-300 rounded-md p-2"
+                value={chartType}
+                onChange={(e) => setChartType(e.target.value as ChartType)}
+                className="border border-gray-300 rounded-md p-2 text-sm"
                 >
-                  <option value="loan_count">貸出回数</option>
-                  <option value="total_duration">総貸出時間</option>
-                  <option value="average_duration">平均貸出時間</option>
+                <option value="loan_count">貸出回数</option>
+                <option value="total_duration">総貸出時間</option>
+                <option value="average_duration">平均貸出時間</option>
                 </select>
               </div>
+              <button
+                onClick={() => {
+                if (chartRef.current) {
+                  const link = document.createElement('a');
+                  link.href = chartRef.current.toBase64Image();
+
+                  const today = new Date();
+                  const yyyy = today.getFullYear().toString();
+                  const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+                  const dd = today.getDate().toString().padStart(2, '0');
+                  const dateString = `${yyyy}${mm}${dd}`;
+                  const selectedEvent = events.find(e => e.event_id === selectedEventId);
+                  const mergeSuffix = mergeByName ? '_統合' : '';
+                  let chartTypeSuffix = '';
+                  switch (chartType) {
+                  case 'loan_count': chartTypeSuffix = '貸出回数'; break;
+                  case 'total_duration': chartTypeSuffix = '総貸出時間'; break;
+                  case 'average_duration': chartTypeSuffix = '平均貸出時間'; break;
+                  }
+                  const fileName = selectedEvent
+                  ? `${dateString}_人気ランキング_${chartTypeSuffix}_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
+                  : `${dateString}_人気ランキング_${chartTypeSuffix}${mergeSuffix}.png`;
+
+                  link.download = fileName;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
+                }}
+                className="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center gap-1 text-sm"
+                title="グラフを画像としてダウンロード"
+              >
+                <Download size={14} />
+                画像DL
+              </button>
+              </div>
               <div className="relative h-[1000px] mb-12">
-                <Bar ref={chartRef} options={chartOptions} data={chartData} />
+              {/* Ensure the ref is correctly passed to the Bar component */}
+              <Bar ref={chartRef} options={chartOptions} data={chartData} />
               </div>
 
               <div className="mt-12">
-                <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体 - 10分間隔)</h3>
-                {lineChartData.labels && lineChartData.labels.length > 0 ? (
-                  <div className="relative h-96">
-                    <Line options={lineChartOptions} data={lineChartData} />
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500 py-8">
-                    このイベントの貸出データはありません。
-                  </div>
-                )}
+              <h3 className="text-lg font-semibold mb-4">時間帯別の貸出傾向 (イベント全体 - 10分間隔)</h3>
+              {lineChartData.labels && lineChartData.labels.length > 0 ? (
+                <div className="relative h-96">
+                <Line options={lineChartOptions} data={lineChartData} />
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                このイベントの貸出データはありません。
+                </div>
+              )}
               </div>
 
               <div className="mt-12">

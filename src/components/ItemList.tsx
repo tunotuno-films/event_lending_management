@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, X, AlertCircle, Undo2, Download, Package, Save } from 'lucide-react';
+import { Pencil, Trash2, X, AlertCircle, Undo2, Download } from 'lucide-react'; // Package, Save をインポート
+import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
+
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Item {
   item_id: string;
@@ -116,46 +119,6 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     customManager: '',
     image: null as File | null
   });
-  const [previewUrl, setPreviewUrl] = useState<string | null>(item.image);
-  const [matchingItemsByName, setMatchingItemsByName] = useState<Pick<Item, 'item_id' | 'name'>[]>([]);
-  const [suggestionNotification, setSuggestionNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
-
-  useEffect(() => {
-    const searchExistingItemsByName = async () => {
-      if (formData.name.trim() === '' || formData.name === item.name) {
-        setMatchingItemsByName([]);
-        return;
-      }
-      try {
-        const { data, error } = await supabase
-          .from('items')
-          .select('item_id, name')
-          .ilike('name', `%${formData.name}%`)
-          .neq('item_id', item.item_id)
-          .eq('item_deleted', false)
-          .limit(5);
-
-        if (error) throw error;
-        setMatchingItemsByName(data || []);
-      } catch (error) {
-        console.error('Error searching existing items by name:', error);
-        setMatchingItemsByName([]);
-      }
-    };
-
-    const debounceTimer = setTimeout(() => {
-      searchExistingItemsByName();
-    }, 300);
-
-    return () => clearTimeout(debounceTimer);
-  }, [formData.name, item.item_id, item.name]);
-
-  const handleSelectSuggestion = (name: string) => {
-    setFormData(prev => ({ ...prev, name: name }));
-    setMatchingItemsByName([]);
-    setSuggestionNotification({ show: true, message: '物品名を入力しました', type: 'success' });
-    setTimeout(() => setSuggestionNotification(null), 3000);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,40 +164,14 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileInput = e.target;
-    if (fileInput.files && fileInput.files[0]) {
-      const file = fileInput.files[0];
-      setFormData(prev => ({ ...prev, image: file }));
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      }
-      reader.readAsDataURL(file);
-    } else {
-      setFormData(prev => ({ ...prev, image: null }));
-      setPreviewUrl(item.image);
-    }
-  };
-
-  const handleRemovePreview = () => {
-    setPreviewUrl(item.image);
-    setFormData(prev => ({ ...prev, image: null }));
-    const fileInput = document.getElementById(`edit-image-upload-${item.item_id}`) as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+    if (e.target.files && e.target.files[0]) {
+      setFormData(prev => ({ ...prev, image: e.target.files![0] }));
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      {suggestionNotification?.show && (
-        <Notification
-          message={suggestionNotification.message}
-          type={suggestionNotification.type}
-          onClose={() => setSuggestionNotification(null)}
-        />
-      )}
-      <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">物品編集</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -250,7 +187,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             <input
               type="text"
               value={item.item_id}
-              className="w-full border border-gray-300 rounded-md p-2 bg-gray-100 font-mono"
+              className="w-full border border-gray-300 rounded-md p-2 bg-gray-100"
               disabled
             />
           </div>
@@ -260,37 +197,17 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <div className="relative inline-block">
-                <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                  {previewUrl && previewUrl.trim() !== '' ? (
-                    <img
-                      src={previewUrl}
-                      alt={item.name}
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                      <Package className="h-10 w-10 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                {(previewUrl !== item.image || formData.image) && (
-                  <button
-                    type="button"
-                    onClick={handleRemovePreview}
-                    className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm hover:bg-gray-100 border"
-                    aria-label="画像変更を取り消す"
-                  >
-                    <X size={16} className="text-gray-600" />
-                  </button>
-                )}
-              </div>
+              <img
+                src={getItemImageUrl(item.image)}
+                alt={item.name}
+                className="h-20 w-20 object-cover rounded-lg"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+              />
               <input
-                id={`edit-image-upload-${item.item_id}`}
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
-                className="flex-1 border border-gray-300 rounded-md p-2 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                className="flex-1 border border-gray-300 rounded-md p-2"
               />
             </div>
           </div>
@@ -306,28 +223,6 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               className="w-full border border-gray-300 rounded-md p-2"
               required
             />
-            {matchingItemsByName.length > 0 && (
-              <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
-                <h4 className="text-xs font-semibold mb-1 text-gray-600">
-                  既存の物品名候補:
-                </h4>
-                <div className="space-y-1">
-                  {matchingItemsByName.map((match) => (
-                    <div key={match.item_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
-                      <span className="truncate mr-2">{match.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSuggestion(match.name)}
-                        className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
-                        title="選択"
-                      >
-                        選択
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <div>
@@ -388,16 +283,14 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              <X size={18} />
               キャンセル
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center gap-2"
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
             >
-              <Save size={18} />
               保存
             </button>
           </div>
@@ -405,6 +298,22 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
       </div>
     </div>
   );
+};
+
+// 画像URLのヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return DEFAULT_IMAGE;
+  
+  // 空文字やundefinedの場合
+  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
+  
+  // 有効なURLでない場合
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
 };
 
 export default function ItemList() {
@@ -419,102 +328,36 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Item | 'item_info' | 'details'; direction: 'asc' | 'desc' } | null>({ key: 'item_id', direction: 'asc' });
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+  // 初期値を item_id の昇順に設定
+  const [sortColumn, setSortColumn] = useState<string>('item_id');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  useEffect(() => {
-    const handleResize = () => {
-      setIsWideScreen(window.innerWidth >= 1800);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+  // ソート状態に基づいてitemsを整列
   const sortedItems = useMemo(() => {
-    if (!sortConfig) return items;
-
-    let sortKey: keyof Item;
-    if (sortConfig.key === 'item_info') {
-      sortKey = 'item_id';
-    } else if (sortConfig.key === 'details') {
-      sortKey = 'genre';
-    } else {
-      sortKey = sortConfig.key as keyof Item;
-    }
-
-    return [...items].sort((a, b) => {
-      let aVal = a[sortKey];
-      let bVal = b[sortKey];
-
-      if (sortKey === 'registered_date') {
+    if (!sortColumn) return items;
+    return items.slice().sort((a, b) => {
+      let aVal = a[sortColumn as keyof Item];
+      let bVal = b[sortColumn as keyof Item];
+      if (sortColumn === 'registered_date') {
         const aDate = new Date(aVal as string);
         const bDate = new Date(bVal as string);
-        if (aDate < bDate) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aDate > bDate) return sortConfig.direction === 'asc' ? 1 : -1;
+        if (aDate < bDate) return sortDirection === 'asc' ? -1 : 1;
+        if (aDate > bDate) return sortDirection === 'asc' ? 1 : -1;
         return 0;
       }
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortConfig.direction === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-
-      if (sortKey === 'item_id') {
-        const numA = parseInt(aVal as string, 10);
-        const numB = parseInt(bVal as string, 10);
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-        }
-      }
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [items, sortConfig]);
+  }, [items, sortColumn, sortDirection]);
 
-  const handleSort = (column: keyof Item | 'item_info' | 'details') => {
-    setSortConfig(prevConfig => {
-      const isCurrentColumn = prevConfig?.key === column;
-      const currentDirection = prevConfig?.direction;
-
-      if (isWideScreen) {
-        if (column === 'item_info' || column === 'details') {
-          return prevConfig;
-        }
-        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
-        return { key: column, direction: direction };
-      } else {
-        if (column === 'item_info') {
-          if (prevConfig?.key === 'item_id' && currentDirection === 'asc') {
-            return { key: 'item_id', direction: 'desc' };
-          } else if (prevConfig?.key === 'item_id' && currentDirection === 'desc') {
-            return { key: 'name', direction: 'asc' };
-          } else if (prevConfig?.key === 'name' && currentDirection === 'asc') {
-            return { key: 'name', direction: 'desc' };
-          } else {
-            return { key: 'item_id', direction: 'asc' };
-          }
-        } else if (column === 'details') {
-          if (prevConfig?.key === 'genre' && currentDirection === 'asc') {
-            return { key: 'genre', direction: 'desc' };
-          } else if (prevConfig?.key === 'genre' && currentDirection === 'desc') {
-            return { key: 'manager', direction: 'asc' };
-          } else if (prevConfig?.key === 'manager' && currentDirection === 'asc') {
-            return { key: 'manager', direction: 'desc' };
-          } else {
-            return { key: 'genre', direction: 'asc' };
-          }
-        } else {
-          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
-          return { key: column, direction: direction };
-        }
-      }
-    });
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
   };
 
   useEffect(() => {
@@ -546,39 +389,13 @@ export default function ItemList() {
     }
   };
 
-  const handleSearch = async () => {
-    if (searchQuery.trim() === '') {
-      fetchItems();
-    } else {
-      try {
-        const { data, error } = await supabase
-          .from('items')
-          .select('*')
-          .or(`item_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
-          .eq('item_deleted', false)
-          .order('registered_date', { ascending: false });
-        if (error) throw error;
-        setItems(data || []);
-      } catch (error) {
-        console.error('Error searching items:', error);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      handleSearch();
-    }, 300);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
-
   const handleUpdateItem = async (updatedItem: Item) => {
     try {
       const { error } = await supabase
         .from('items')
         .update({
           name: updatedItem.name,
-          image: updatedItem.image || null,
+          image: updatedItem.image || null, // 空文字列の場合はnullに
           genre: updatedItem.genre,
           manager: updatedItem.manager
         })
@@ -668,6 +485,7 @@ export default function ItemList() {
     });
   };
 
+  // CSV用エスケープ関数を修正：nullの場合は空文字を返す
   const escapeCSV = (value: string | null): string => {
     if (!value) return '';
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -676,6 +494,7 @@ export default function ItemList() {
     return value;
   };
 
+  // CSVエクスポート処理の実装を修正
   const handleCSVExport = () => {
     let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
     items.forEach(item => {
@@ -686,6 +505,7 @@ export default function ItemList() {
     const a = document.createElement('a');
     a.href = url;
     
+    // ファイル名をyyyyMMdd_物品一覧.csv形式で作成
     const today = new Date();
     const yyyy = today.getFullYear().toString();
     const mm = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -697,63 +517,6 @@ export default function ItemList() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
-  const getSortIndicator = (targetKey: keyof Item | 'item_info' | 'details') => {
-    if (!sortConfig) return null;
-
-    let isActive = false;
-    let direction = sortConfig.direction;
-    let displayKey: string = '';
-
-    if (isWideScreen) {
-      isActive = sortConfig.key === targetKey;
-      displayKey = '';
-    } else {
-      if (targetKey === 'item_info') {
-        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
-        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'name' ? '物品名' : '';
-      } else if (targetKey === 'details') {
-        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
-        displayKey = sortConfig.key === 'genre' ? 'ジャンル' : sortConfig.key === 'manager' ? '管理者' : '';
-      } else {
-        isActive = sortConfig.key === targetKey;
-        displayKey = '';
-      }
-    }
-
-    if (!isActive) return null;
-
-    const arrow = direction === 'asc' ? '↑' : '↓';
-    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
-  };
-
-  const getSortBgColor = (targetKey: keyof Item | 'item_info' | 'details') => {
-    if (!sortConfig) return '';
-
-    let isActive = false;
-    if (isWideScreen) {
-      isActive = sortConfig.key === targetKey;
-    } else {
-      if (targetKey === 'item_info') {
-        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
-      } else if (targetKey === 'details') {
-        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
-      } else {
-        isActive = sortConfig.key === targetKey;
-      }
-    }
-
-    if (!isActive) return '';
-    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -780,150 +543,127 @@ export default function ItemList() {
         </div>
       </div>
   
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="物品IDまたは物品名で検索"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full border border-gray-300 rounded-md p-2 font-mono"
-        />
-      </div>
-  
       <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="w-full min-w-[800px] divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr className="align-middle">
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                画像
-              </th>
-              <th
-                onClick={() => !isWideScreen && handleSort('item_info')}
-                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
-              >
-                {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
-              </th>
-              <th
-                onClick={() => isWideScreen && handleSort('item_id')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
-              >
-                物品ID {getSortIndicator('item_id')}
-              </th>
-              <th
-                onClick={() => isWideScreen && handleSort('name')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('name')}`}
-              >
-                物品名 {getSortIndicator('name')}
-              </th>
-              <th
-                onClick={() => !isWideScreen && handleSort('details')}
-                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('details')}`}
-              >
-                {!getSortIndicator('details') && '詳細情報'} {getSortIndicator('details')}
-              </th>
-              <th
-                onClick={() => isWideScreen && handleSort('genre')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('genre')}`}
-              >
-                ジャンル {getSortIndicator('genre')}
-              </th>
-              <th
-                onClick={() => isWideScreen && handleSort('manager')}
-                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('manager')}`}
-              >
-                管理者 {getSortIndicator('manager')}
-              </th>
-              <th
-                onClick={() => handleSort('registered_date')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('registered_date')}`}
-              >
-                登録日 {getSortIndicator('registered_date')}
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                編集
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                削除
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {sortedItems.map((item) => (
-              <tr key={item.item_id} className="hover:bg-gray-50 align-middle">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                    {item.image && item.image.trim() !== '' ? (
+        {/* テーブル表示前にローディング状態をチェック */}
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[200px]">
+            <LoadingIndicator />
+          </div>
+        ) : items.length === 0 ? ( // ローディング完了後、アイテムがない場合の表示
+          <div className="text-center py-10 text-gray-500">
+            登録されている物品はありません。
+          </div>
+        ) : (
+          <table className="w-full min-w-[800px] divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr className="align-middle">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  画像
+                </th>
+                <th
+                  onClick={() => handleSort('item_id')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='item_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  物品ID {sortColumn==='item_id' && (
+                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th
+                  onClick={() => handleSort('name')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  物品名 {sortColumn==='name' && (
+                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th
+                  onClick={() => handleSort('genre')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='genre' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  ジャンル {sortColumn==='genre' && (
+                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th
+                  onClick={() => handleSort('manager')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='manager' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  管理者 {sortColumn==='manager' && (
+                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th
+                  onClick={() => handleSort('registered_date')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='registered_date' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  登録日 {sortColumn==='registered_date' && (
+                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  編集
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  削除
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedItems.map((item) => (
+                <tr key={item.item_id} className="hover:bg-gray-50 align-middle">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
                       <img
-                        src={item.image}
+                        src={getItemImageUrl(item.image)}
                         alt={item.name}
                         className="max-h-full max-w-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                       />
-                    ) : (
-                      <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                        <Package className="h-6 w-6 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 min-[1800px]:hidden">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-mono">{item.item_id}</span>
-                    <span className="text-xs text-gray-600 break-words">{item.name}</span>
-                  </div>
-                </td>
-                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-mono">
-                    {item.item_id}
-                  </div>
-                </td>
-                <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
-                  <div className="text-sm text-gray-900 truncate" title={item.name}>{item.name}</div>
-                </td>
-                <td className="px-6 py-4 min-[1800px]:hidden">
-                  <div className="flex flex-col gap-1">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 w-fit">
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{item.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {item.genre}
                     </span>
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 w-fit">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
                       {item.manager}
                     </span>
-                  </div>
-                </td>
-                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {item.genre}
-                  </span>
-                </td>
-                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                    {item.manager}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {formatDate(item.registered_date)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                  <button
-                    onClick={() => setEditingItem(item)}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                  <button
-                    onClick={() => setDeletingItem(item)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatDate(item.registered_date)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <button
+                      onClick={() => setEditingItem(item)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <button
+                      onClick={() => setDeletingItem(item)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
   
+      {/* モーダル部分 */}
       {editingItem && (
         <EditModal
           item={editingItem}

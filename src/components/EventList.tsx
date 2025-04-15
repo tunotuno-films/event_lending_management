@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import LoadingIndicator from './LoadingIndicator';
 
 interface Event {
   event_id: string;
@@ -438,14 +439,6 @@ export default function EventsList() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       {notification.show && (
@@ -473,71 +466,77 @@ export default function EventsList() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th
-                onClick={() => handleSort('event_id')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='event_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-              >
-                イベントID {sortColumn==='event_id' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
-              </th>
-              <th
-                onClick={() => handleSort('name')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-              >
-                イベント名 {sortColumn==='name' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
-              </th>
-              <th
-                onClick={() => handleSort('created_at')}
-                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='created_at' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-              >
-                作成日時 {sortColumn==='created_at' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                編集
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                削除
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {sortedEvents.map((event) => (
-              <tr 
-                key={event.event_id} 
-                className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => setSelectedForNavigation(event)}
-              >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900 break-words max-w-xs" title={event.name}>{event.name}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(event.created_at)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setEditingEvent(event); }}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeletingEvent(event); }}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[200px]">
+            <LoadingIndicator />
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th
+                  onClick={() => handleSort('event_id')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='event_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  イベントID {sortColumn==='event_id' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
+                </th>
+                <th
+                  onClick={() => handleSort('name')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  イベント名 {sortColumn==='name' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
+                </th>
+                <th
+                  onClick={() => handleSort('created_at')}
+                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='created_at' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
+                >
+                  作成日時 {sortColumn==='created_at' && (<span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>)}
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  編集
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  削除
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedEvents.map((event) => (
+                <tr 
+                  key={event.event_id} 
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setSelectedForNavigation(event)}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 break-words max-w-xs" title={event.name}>{event.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatDate(event.created_at)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingEvent(event); }}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeletingEvent(event); }}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {editingEvent && (

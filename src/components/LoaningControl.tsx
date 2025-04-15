@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
 import { AlertCircle, X, Barcode, StopCircle, Package } from 'lucide-react';
 import { useZxing } from 'react-zxing';
+import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
 // --- インターフェース定義 (修正) ---
 interface Event {
@@ -184,7 +185,7 @@ export default function LoaningControl() {
   const fetchItems = useCallback(async () => {
     if (!selectedEventId) return;
 
-    setIsLoadingItems(true);
+    setIsLoadingItems(true); // ローディング開始
     console.log(`Fetching items and loan count for event: ${selectedEventId}`);
 
     try {
@@ -243,7 +244,7 @@ export default function LoaningControl() {
       setLoanedItems([]);
       setTotalLoanCount(0);
     } finally {
-      setIsLoadingItems(false);
+      setIsLoadingItems(false); // ローディング終了
     }
   }, [selectedEventId]);
 
@@ -803,66 +804,67 @@ export default function LoaningControl() {
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="text-lg font-semibold">待機中のアイテム</h3>
                 <div className="flex items-center gap-2">
-                  {isLoadingItems && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                  )}
                   <span className="text-lg font-semibold font-mono">{waitingItems.length}</span>
                 </div>
               </div>
               <div className="p-4">
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {waitingItems.length === 0 ? (
-                        <tr><td colSpan={4} className="text-center py-4 text-gray-500">待機中のアイテムはありません</td></tr>
-                      ) : (
-                        waitingItems.map((control) => {
-                          const imageUrl = control.items?.image;
-                          const itemName = control.items?.name || 'アイテム画像';
-                          return (
-                            <tr key={control.control_id}>
-                              <td className="px-4 py-2">
-                                <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
-                                  {imageUrl && imageUrl.trim() !== '' ? (
-                                    <img
-                                      src={imageUrl}
-                                      alt={itemName}
-                                      className="max-h-full max-w-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                                      <Package className="h-6 w-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-2">
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                  <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
-                                </div>
-                              </td>
-                              <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
-                                <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                {isLoadingItems ? ( // isLoadingItems が true の場合にローディング表示
+                  <LoadingIndicator />
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
+                          <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {waitingItems.length === 0 ? (
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-500">待機中のアイテムはありません</td></tr>
+                        ) : (
+                          waitingItems.map((control) => {
+                            const imageUrl = control.items?.image;
+                            const itemName = control.items?.name || 'アイテム画像';
+                            return (
+                              <tr key={control.control_id}>
+                                <td className="px-4 py-2">
+                                  <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                    {imageUrl && imageUrl.trim() !== '' ? (
+                                      <img
+                                        src={imageUrl}
+                                        alt={itemName}
+                                        className="max-h-full max-w-full object-contain"
+                                      />
+                                    ) : (
+                                      <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                        <Package className="h-6 w-6 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                    <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                  </div>
+                                </td>
+                                <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                                  <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -870,70 +872,71 @@ export default function LoaningControl() {
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="text-lg font-semibold">貸出中のアイテム</h3>
                 <div className="flex items-center gap-2">
-                  {isLoadingItems && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                  )}
                   <span className="text-lg font-semibold font-mono">{loanedItems.length}</span>
                 </div>
               </div>
               <div className="p-4">
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
-                        <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {loanedItems.length === 0 ? (
-                        <tr><td colSpan={5} className="text-center py-4 text-gray-500">貸出中のアイテムはありません</td></tr>
-                      ) : (
-                        loanedItems.map((control) => {
-                          const imageUrl = control.items?.image;
-                          const itemName = control.items?.name || 'アイテム画像';
-                          return (
-                            <tr key={control.control_id}>
-                              <td className="px-4 py-2">
-                                <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
-                                  {imageUrl && imageUrl.trim() !== '' ? (
-                                    <img
-                                      src={imageUrl}
-                                      alt={itemName}
-                                      className="max-h-full max-w-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                                      <Package className="h-6 w-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-2">
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
-                                  <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
-                                </div>
-                              </td>
-                              <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
-                                <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
-                                  返却
-                                </button>
-                              </td>
-                              <td className="px-4 py-2"><span className="text-sm text-red-500">{formatElapsedTime(control.control_datetime)}</span></td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                {isLoadingItems ? ( // isLoadingItems が true の場合にローディング表示
+                  <LoadingIndicator />
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">画像</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">物品情報</th>
+                          <th className="hidden min-[1800px]:table-cell px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase max-w-xs">物品名</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">経過時間</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {loanedItems.length === 0 ? (
+                          <tr><td colSpan={5} className="text-center py-4 text-gray-500">貸出中のアイテムはありません</td></tr>
+                        ) : (
+                          loanedItems.map((control) => {
+                            const imageUrl = control.items?.image;
+                            const itemName = control.items?.name || 'アイテム画像';
+                            return (
+                              <tr key={control.control_id}>
+                                <td className="px-4 py-2">
+                                  <div className="h-10 w-10 rounded overflow-hidden border flex items-center justify-center bg-white">
+                                    {imageUrl && imageUrl.trim() !== '' ? (
+                                      <img
+                                        src={imageUrl}
+                                        alt={itemName}
+                                        className="max-h-full max-w-full object-contain"
+                                      />
+                                    ) : (
+                                      <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                        <Package className="h-6 w-6 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-mono">{control.items?.item_id ?? 'N/A'}</span>
+                                    <span className="text-xs text-gray-600 min-[1800px]:hidden">{control.items?.name ?? '不明な物品'}</span>
+                                  </div>
+                                </td>
+                                <td className="hidden min-[1800px]:table-cell px-4 py-2 max-w-xs">
+                                  <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
+                                    返却
+                                  </button>
+                                </td>
+                                <td className="px-4 py-2"><span className="text-sm text-red-500">{formatElapsedTime(control.control_datetime)}</span></td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>

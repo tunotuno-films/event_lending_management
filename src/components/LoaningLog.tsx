@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
 import { AlertCircle, X, Download, Clock, Package } from 'lucide-react';
+import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
 interface Event {
   event_id: string;
@@ -35,16 +36,12 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    // countdown をリセット
     setCountdown(5);
     const timer = setInterval(() => {
       setCountdown((prev) => {
-        // newCount を計算
         const newCount = prev - 1;
-        // 条件を newCount <= 0 に変更
         if (newCount <= 0) {
           clearInterval(timer);
-          // onClose が存在する場合のみ呼び出す
           if (onClose) onClose();
           return 0;
         }
@@ -53,7 +50,6 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
     }, 1000);
 
     return () => clearInterval(timer);
-    // 依存配列に message を追加
   }, [message, onClose]);
 
   const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
@@ -77,6 +73,7 @@ export default function LoaningLog() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [loanRecords, setLoanRecords] = useState<LoanRecord[]>([]);
+  const [loading, setLoading] = useState(false); // loading state を追加
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({
     show: false,
     message: '',
@@ -141,6 +138,7 @@ export default function LoaningLog() {
   };
 
   const fetchLoanRecords = async () => {
+    setLoading(true); // データ取得開始時に loading を true に設定
     try {
       const { data: basicData, error: basicError } = await supabase
         .from('result')
@@ -193,6 +191,8 @@ export default function LoaningLog() {
         message: '貸出履歴の取得中にエラーが発生しました',
         type: 'error'
       });
+    } finally {
+      setLoading(false); // データ取得完了時（成功・失敗問わず）に loading を false に設定
     }
   };
 
@@ -562,116 +562,124 @@ export default function LoaningLog() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    画像
-                  </th>
-                  <th
-                    onClick={() => !isWideScreen && handleSort('item_info')}
-                    className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
-                  >
-                    <button className="flex items-center gap-1 hover:text-gray-700">
-                      {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
-                    </button>
-                  </th>
-                  <th
-                    onClick={() => isWideScreen && handleSort('item_id')}
-                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
-                  >
-                    <button className="flex items-center gap-1 hover:text-gray-700">
-                      物品ID {getSortIndicator('item_id')}
-                    </button>
-                  </th>
-                  <th
-                    onClick={() => isWideScreen && handleSort('item')}
-                    className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('item')}`}
-                  >
-                    <button className="flex items-center gap-1 hover:text-gray-700">
-                      物品名 {getSortIndicator('item')}
-                    </button>
-                  </th>
-                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('loan_period')}`}>
-                    <button
-                      onClick={() => handleSort('loan_period')}
-                      className="flex items-center gap-1 hover:text-gray-700"
+          {loading ? ( // loading が true の場合にローディングインジケーターを表示
+            <LoadingIndicator />
+          ) : loanRecords.length === 0 ? ( // データがない場合の表示
+            <div className="text-center py-10 text-gray-500">
+              貸出履歴がありません。
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      画像
+                    </th>
+                    <th
+                      onClick={() => !isWideScreen && handleSort('item_info')}
+                      className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
                     >
-                      貸出時間
-                      {getSortIndicator('loan_period')}
-                    </button>
-                  </th>
-                  <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('duration')}`}>
-                    <button
-                      onClick={() => handleSort('duration')}
-                      className="flex items-center gap-1 hover:text-gray-700"
+                      <button className="flex items-center gap-1 hover:text-gray-700">
+                        {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
+                      </button>
+                    </th>
+                    <th
+                      onClick={() => isWideScreen && handleSort('item_id')}
+                      className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
                     >
-                      <Clock size={14} className="mr-1" />
-                      貸出期間
-                      {getSortIndicator('duration')}
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedLoanRecords.map((record) => {
-                  const item = record.item || record.items;
-                  const imageUrl = item?.image;
-                  const itemName = item?.name || '名前不明';
-                  const startTimeStr = formatTimeOnly(record.start_datetime);
-                  const endTimeStr = record.end_datetime ? formatTimeOnly(record.end_datetime) : '未返却';
-                  const durationStr = formatLoanDuration(record.start_datetime, record.end_datetime);
+                      <button className="flex items-center gap-1 hover:text-gray-700">
+                        物品ID {getSortIndicator('item_id')}
+                      </button>
+                    </th>
+                    <th
+                      onClick={() => isWideScreen && handleSort('item')}
+                      className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('item')}`}
+                    >
+                      <button className="flex items-center gap-1 hover:text-gray-700">
+                        物品名 {getSortIndicator('item')}
+                      </button>
+                    </th>
+                    <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('loan_period')}`}>
+                      <button
+                        onClick={() => handleSort('loan_period')}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        貸出時間
+                        {getSortIndicator('loan_period')}
+                      </button>
+                    </th>
+                    <th className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('duration')}`}>
+                      <button
+                        onClick={() => handleSort('duration')}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        <Clock size={14} className="mr-1" />
+                        貸出期間
+                        {getSortIndicator('duration')}
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedLoanRecords.map((record) => {
+                    const item = record.item || record.items;
+                    const imageUrl = item?.image;
+                    const itemName = item?.name || '名前不明';
+                    const startTimeStr = formatTimeOnly(record.start_datetime);
+                    const endTimeStr = record.end_datetime ? formatTimeOnly(record.end_datetime) : '未返却';
+                    const durationStr = formatLoanDuration(record.start_datetime, record.end_datetime);
 
-                  return (
-                    <tr key={record.result_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                          {imageUrl && imageUrl.trim() !== '' ? (
-                            <img
-                              src={imageUrl}
-                              alt={itemName}
-                              className="max-h-full max-w-full object-contain"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                              <Package className="h-6 w-6 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 min-[1800px]:hidden">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-mono">{record.item_id || '-'}</span>
-                          <span className="text-xs text-gray-600">{itemName}</span>
-                        </div>
-                      </td>
-                      <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-mono">
-                          {record.item_id || '-'}
-                        </div>
-                      </td>
-                      <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
-                        <div className="text-sm truncate" title={itemName}>{itemName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-sm font-mono">
-                          <span className="text-green-600">{startTimeStr}</span>
-                          <span>→</span>
-                          <span className={record.end_datetime ? "text-red-600" : "text-yellow-500 text-xs"}>
-                            {endTimeStr}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-700">{durationStr}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={record.result_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                            {imageUrl && imageUrl.trim() !== '' ? (
+                              <img
+                                src={imageUrl}
+                                alt={itemName}
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            ) : (
+                              <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                <Package className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 min-[1800px]:hidden">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-mono">{record.item_id || '-'}</span>
+                            <span className="text-xs text-gray-600">{itemName}</span>
+                          </div>
+                        </td>
+                        <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-mono">
+                            {record.item_id || '-'}
+                          </div>
+                        </td>
+                        <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
+                          <div className="text-sm truncate" title={itemName}>{itemName}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1 text-sm font-mono">
+                            <span className="text-green-600">{startTimeStr}</span>
+                            <span>→</span>
+                            <span className={record.end_datetime ? "text-red-600" : "text-yellow-500 text-xs"}>
+                              {endTimeStr}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-700">{durationStr}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
     </div>

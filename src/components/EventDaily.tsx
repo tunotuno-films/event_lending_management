@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase';
 import { AlertCircle, X, Package } from 'lucide-react';
+import LoadingIndicator from './LoadingIndicator';
 
 interface Event {
   id: number;
@@ -382,9 +383,8 @@ export default function EventDaily() {
           </div>
 
           {loadingItems ? (
-            <div className="text-center text-gray-500 my-8 flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-              <span>アイテムを読み込み中...</span>
+            <div className="flex justify-center items-center min-h-[100px] my-8">
+              <LoadingIndicator />
             </div>
           ) : items.length === 0 ? (
             <p className="text-center text-gray-500 my-8">

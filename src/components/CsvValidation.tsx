@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'; // use
 import { useNavigate } from 'react-router-dom';
 import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase'; // insertWithOwnerId, getCurrentUserId をインポート
 import { AlertCircle, X, CheckCircle, Loader2 } from 'lucide-react'; // アイコン追加
+import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
 // CsvItem インターフェース (変更なし)
 interface CsvItem {
@@ -288,12 +289,7 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h2 className="text-xl font-semibold">CSVデータの検証結果</h2>
-          {isValidating ? (
-            <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              全{csvData.length}件を検証中...
-            </p>
-          ) : (
+          {!isValidating && ( // isValidating が false の時だけ件数を表示
             <p className="text-sm text-gray-500 mt-1">
               全{items.length}件中 {items.filter(item => item.isValid).length}件が登録可能です
             </p>
@@ -302,8 +298,8 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
       </div>
 
       {/* バリデーション結果テーブル */}
-      {isValidating ? (
-        <div className="text-center py-10 text-gray-500">検証中...</div>
+      {isValidating ? ( // テーブル表示前のローディング表示は残す
+        <LoadingIndicator />
       ) : items.length === 0 && csvData.length > 0 ? (
         <div className="text-center py-10 text-red-500">検証処理に失敗したか、有効なデータがありませんでした。</div>
       ) : items.length === 0 && csvData.length === 0 ? (

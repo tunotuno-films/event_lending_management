@@ -1,4 +1,4 @@
-  import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
   import { supabase } from '../lib/supabase';
   import { AlertCircle, X, Download, Package } from 'lucide-react';
   import { Bar, Line, Scatter } from 'react-chartjs-2';
@@ -92,9 +92,9 @@
   };
 
   const formatDuration = (seconds: number): string => {
-    if (seconds < 0) return '0秒'; // 0秒未満は0秒と表示
+    if (seconds < 0) return '0秒';
 
-    const totalSeconds = Math.round(seconds); // 秒数を整数に丸める
+    const totalSeconds = Math.round(seconds);
 
     if (totalSeconds === 0) {
       return '0秒';
@@ -104,21 +104,17 @@
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const remainingSeconds = totalSeconds % 60;
 
-    let result = '';
-    if (hours > 0) {
-      result += `${hours}時間`;
-    }
-    if (minutes > 0) {
-      // 時間が表示されている場合、または分が0より大きい場合に分を追加
-      result += `${minutes}分`;
-    }
-    // 秒が0より大きい場合、または時間がなく分もない場合に秒を追加 (例: 30秒)
-    if (remainingSeconds > 0 || (hours === 0 && minutes === 0)) {
-      result += `${remainingSeconds}秒`;
-    }
+    let parts: string[] = [];
 
-    // 結果が空の場合は "0秒" を返す (念のため)
-    return result || '0秒';
+    if (hours > 0) {
+      parts.push(`${hours}時間`);
+    }
+    if (hours > 0 || minutes > 0) {
+      parts.push(`${minutes}分`);
+    }
+    parts.push(`${remainingSeconds}秒`);
+
+    return parts.join('');
   };
 
   // Define chart types
@@ -581,14 +577,7 @@
                 if (chartType === 'total_duration' || chartType === 'average_duration') {
                   const numericValue = typeof value === 'string' ? parseFloat(value) : value;
                   if (typeof numericValue === 'number' && Number.isFinite(numericValue)) {
-                    const totalSeconds = Math.round(numericValue);
-                    const minutes = Math.floor(totalSeconds / 60);
-                    const seconds = totalSeconds % 60;
-                    if (minutes > 0) {
-                      return `${minutes}分${seconds}秒`;
-                    } else {
-                      return `${seconds}秒`;
-                    }
+                    return formatDuration(numericValue);
                   }
                   return value;
                 }

@@ -590,6 +590,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
               display: true,
               text: '物品名',
             },
+            ticks: {
+              autoSkip: false
+            }
           },
         },
         plugins: {

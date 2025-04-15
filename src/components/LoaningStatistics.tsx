@@ -1200,218 +1200,249 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
                   <div className="mb-4 flex justify-between items-center">
                   <h3 className="text-lg font-semibold">ヒートマップ</h3>
                   <button
-                    onClick={async () => {
-                    try {
-                      // Dynamically import html2canvas when needed
-                      const html2canvasModule = await import('html2canvas');
-                      const html2canvas = html2canvasModule.default;
+                  onClick={async () => {
+                  try {
+                  // Dynamically import html2canvas when needed
+                  const html2canvasModule = await import('html2canvas');
+                  const html2canvas = html2canvasModule.default;
 
-                      const heatmapElement = document.getElementById('heatmap-table-container');
-                      if (!heatmapElement) {
-                      throw new Error('Heatmap element not found');
-                      }
+                  const heatmapElement = document.getElementById('heatmap-table-container');
+                  if (!heatmapElement) {
+                  throw new Error('Heatmap element not found');
+                  }
+                  
+                  // Store the scrollable container reference
+                  const scrollContainer = heatmapElement.closest('.overflow-x-auto');
+                  
+                  // Save original scroll position
+                  const originalScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+                  
+                  // Show loading notification
+                  setNotification({
+                  show: true,
+                  message: 'ヒートマップ画像を生成中...',
+                  type: 'success'
+                  });
+                  
+                  // Reset scroll position if needed
+                  if (scrollContainer) {
+                  scrollContainer.scrollLeft = 0;
+                  }
 
-                      // Show loading notification
-                      setNotification({
-                      show: true,
-                      message: 'ヒートマップ画像を生成中...',
-                      type: 'success'
-                      });
+                  // Capture the heatmap table
+                  const canvas = await html2canvas(heatmapElement, {
+                  scale: 2, // Higher quality
+                  useCORS: true, // Allow images from cross-origin
+                  scrollX: 0,
+                  scrollY: 0,
+                  width: heatmapElement.scrollWidth,
+                  height: heatmapElement.scrollHeight,
+                  letterRendering: true,
+                  allowTaint: true,
+                  backgroundColor: '#ffffff',
+                  logging: false,
+                  onclone: (document: Document) => {
+                  // Force layout calculation before rendering
+                  const clonedElement = document.getElementById('heatmap-table-container');
+                  if (clonedElement) {
+                  // Fix text rendering by adding extra padding and line height
+                  clonedElement.querySelectorAll('td, th').forEach(el => {
+                  const cell = el as HTMLElement;
+                  cell.style.padding = '10px';
+                  cell.style.lineHeight = '1.5';
+                  });
+                  
+                  // Ensure text containers have proper height
+                  clonedElement.querySelectorAll('.text-sm, .text-xs').forEach(el => {
+                  const text = el as HTMLElement;
+                  text.style.lineHeight = '1.6';
+                  text.style.paddingTop = '2px';
+                  text.style.paddingBottom = '2px';
+                  });
+                  
+                  // Fix rounded cells display
+                  clonedElement.querySelectorAll('.rounded').forEach(el => {
+                  const div = el as HTMLElement;
+                  div.style.display = 'flex';
+                  div.style.alignItems = 'center';
+                  div.style.justifyContent = 'center';
+                  });
+                  }
+                  }
+                  } as Html2CanvasOptions);
+                  
+                  // Restore original scroll position
+                  if (scrollContainer) {
+                  scrollContainer.scrollLeft = originalScrollLeft;
+                  }
 
-                      // Capture the heatmap table
-                      const canvas = await html2canvas(heatmapElement, {
-                      scale: 2, // Higher quality
-                      useCORS: true, // Allow images from cross-origin
-                      scrollX: 0,
-                        scrollY: 0,
-                        width: heatmapElement.scrollWidth,
-                        height: heatmapElement.scrollHeight,
-                        letterRendering: true,
-                        allowTaint: true,
-                        backgroundColor: '#ffffff',
-                        logging: false,
-                        onclone: (document: Document) => {
-                          // Force layout calculation before rendering
-                          const clonedElement = document.getElementById('heatmap-table-container');
-                          if (clonedElement) {
-                            clonedElement.querySelectorAll('.rounded').forEach(el => {
-                              // Ensure styles are fully applied
-                              const div = el as HTMLElement;
-                              div.style.display = 'flex';
-                              div.style.alignItems = 'center';
-                              div.style.justifyContent = 'center';
-                            });
-                          }
-                        }
-                      } as Html2CanvasOptions);
+                  // Define the interface for html2canvas options
+                  interface Html2CanvasOptions {
+                  scrollX: number;
+                  scrollY: number;
+                  width: number;
+                  height: number;
+                  letterRendering: boolean;
+                  allowTaint: boolean;
+                  backgroundColor: string;
+                  logging: boolean;
+                  onclone: (document: Document) => void;
+                  scale?: number;
+                  useCORS?: boolean;
+                  } // Type assertion to bypass TypeScript checking
 
-                      // Define the interface for html2canvas options
-                      interface Html2CanvasOptions {
-                        scrollX: number;
-                        scrollY: number;
-                        width: number;
-                        height: number;
-                        letterRendering: boolean;
-                        allowTaint: boolean;
-                        backgroundColor: string;
-                        logging: boolean;
-                        onclone: (document: Document) => void;
-                        scale?: number;
-                        useCORS?: boolean;
-                      } // Type assertion to bypass TypeScript checking
+                  // Convert to data URL
+                  const dataUrl = canvas.toDataURL('image/png');
 
-                      // Convert to data URL
-                      const dataUrl = canvas.toDataURL('image/png');
+                  // Create download link
+                  const link = document.createElement('a');
+                  link.href = dataUrl;
 
-                      // Create download link
-                      const link = document.createElement('a');
-                      link.href = dataUrl;
-
-                      // Set filename
-                      const today = new Date();
-                      const yyyy = today.getFullYear().toString();
-                      const mm = (today.getMonth() + 1).toString().padStart(2, '0');
-                      const dd = today.getDate().toString().padStart(2, '0');
-                      const dateString = `${yyyy}${mm}${dd}`;
-                      const selectedEvent = events.find(e => e.event_id === selectedEventId);
-                      const mergeSuffix = mergeByName ? '_統合' : '';
-                      const fileName = selectedEvent
-                      ? `${dateString}_貸出ヒートマップ_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
-                      : `${dateString}_貸出ヒートマップ${mergeSuffix}.png`;
-                      
-                      link.download = fileName;
-                      
-                      // Trigger download
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      
-                      setNotification({
-                      show: true,
-                      message: 'ヒートマップ画像をダウンロードしました',
-                      type: 'success'
-                      });
-                    } catch (error) {
-                      console.error('Error downloading heatmap:', error);
-                      setNotification({
-                      show: true,
-                      message: 'ヒートマップ画像のダウンロードに失敗しました',
-                      type: 'error'
-                      });
-                    }
-                    }}
-                    className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
-                    title="ヒートマップを画像としてダウンロード"
+                  // Set filename
+                  const today = new Date();
+                  const yyyy = today.getFullYear().toString();
+                  const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+                  const dd = today.getDate().toString().padStart(2, '0');
+                  const dateString = `${yyyy}${mm}${dd}`;
+                  const selectedEvent = events.find(e => e.event_id === selectedEventId);
+                  const mergeSuffix = mergeByName ? '_統合' : '';
+                  const fileName = selectedEvent
+                  ? `${dateString}_貸出ヒートマップ_${selectedEvent.event_id}-${selectedEvent.name}${mergeSuffix}.png`
+                  : `${dateString}_貸出ヒートマップ${mergeSuffix}.png`;
+                  
+                  link.download = fileName;
+                  
+                  // Trigger download
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  
+                  setNotification({
+                  show: true,
+                  message: 'ヒートマップ画像をダウンロードしました',
+                  type: 'success'
+                  });
+                  } catch (error) {
+                  console.error('Error downloading heatmap:', error);
+                  setNotification({
+                  show: true,
+                  message: 'ヒートマップ画像のダウンロードに失敗しました',
+                  type: 'error'
+                  });
+                  }
+                  }}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1 text-sm"
+                  title="ヒートマップを画像としてダウンロード"
                   >
-                    <Download size={14} />
-                    画像ダウンロード
+                  <Download size={14} />
+                  画像ダウンロード
                   </button>
                   </div>
                   <div className="relative">
                   <div className="overflow-x-auto">
-                    <div id="heatmap-table-container" className="inline-block min-w-full border rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                      <tr className="relative">
-                        <th className="sticky left-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
-                        画像
-                        </th>
-                        <th className="sticky left-[100px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] min-[1800px]:hidden border-l-0">
-                        物品情報
-                        </th>
-                        <th
-                        className="hidden min-[1800px]:table-cell sticky left-[100px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-l-0"
-                        >
-                        物品ID
-                        </th>
-                        <th
-                        className="hidden min-[1800px]:table-cell sticky left-[250px] z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs border-l-0"
-                        >
-                        物品名
-                        </th>
-                        {HOURS.map(hour => (
-                        <th key={hour} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] min-w-[50px]">
-                          {hour}
-                        </th>
-                        ))}
-                      </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                      {sortedDisplayStatistics.map((stat) => {
-                        const maxCount = Math.max(...stat.hourly_usage, 1);
+                  <div id="heatmap-table-container" className="inline-block min-w-full border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                  <tr className="relative">
+                  <th className="sticky left-0 z-30 bg-gray-50 px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] h-[60px]">
+                  画像
+                  </th>
+                  <th className="sticky left-[100px] z-30 bg-gray-50 px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] min-[1800px]:hidden border-l-0 h-[60px]">
+                  物品情報
+                  </th>
+                  <th
+                  className="hidden min-[1800px]:table-cell sticky left-[100px] z-30 bg-gray-50 px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-l-0 h-[60px]"
+                  >
+                  物品ID
+                  </th>
+                  <th
+                  className="hidden min-[1800px]:table-cell sticky left-[250px] z-30 bg-gray-50 px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs border-l-0 h-[60px]"
+                  >
+                  物品名
+                  </th>
+                  {HOURS.map(hour => (
+                  <th key={hour} className="px-2 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] min-w-[50px] h-[60px]">
+                  {hour}
+                  </th>
+                  ))}
+                  </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedDisplayStatistics.map((stat) => {
+                  const maxCount = Math.max(...stat.hourly_usage, 1);
 
-                        let displayItemId: string | React.ReactNode = stat.item_id;
-                        let fractionDisplay: React.ReactNode = null;
+                  let displayItemId: string | React.ReactNode = stat.item_id;
+                  let fractionDisplay: React.ReactNode = null;
 
-                        if (mergeByName && stat.original_item_ids && stat.original_item_ids.length > 0) {
-                        const currentIdIndex = animatedIdIndices[stat.item_name] ?? 0;
-                        const totalIds = stat.original_item_ids.length;
-                        displayItemId = stat.original_item_ids[currentIdIndex];
+                  if (mergeByName && stat.original_item_ids && stat.original_item_ids.length > 0) {
+                  const currentIdIndex = animatedIdIndices[stat.item_name] ?? 0;
+                  const totalIds = stat.original_item_ids.length;
+                  displayItemId = stat.original_item_ids[currentIdIndex];
 
-                        if (totalIds > 1) {
-                          displayItemId = (
-                          <span key={currentIdIndex} className="animate-fade-in-out">
-                            {displayItemId}
-                          </span>
-                          );
-                          fractionDisplay = (
-                          <span className="ml-1 text-xs text-gray-400">
-                            {currentIdIndex + 1}/{totalIds}
-                          </span>
-                          );
-                        }
-                        }
+                  if (totalIds > 1) {
+                  displayItemId = (
+                  <span key={currentIdIndex} className="animate-fade-in-out">
+                  {displayItemId}
+                  </span>
+                  );
+                  fractionDisplay = (
+                  <span className="ml-1 text-xs text-gray-400">
+                  {currentIdIndex + 1}/{totalIds}
+                  </span>
+                  );
+                  }
+                  }
 
-                        return (
-                        <tr key={`heatmap-${mergeByName ? stat.item_name : stat.item_id}`} className="relative">
-                          <td className="sticky left-0 z-20 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
-                          <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                            {stat.image && stat.image.trim() !== '' ? (
-                            <img
-                              src={stat.image}
-                              alt={stat.item_name}
-                              className="max-h-full max-w-full object-contain"
-                            />
-                            ) : (
-                            <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                              <Package className="h-6 w-6 text-gray-400" />
-                            </div>
-                            )}
-                          </div>
-                          </td>
-                          <td className="sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap w-[150px] min-[1800px]:hidden border-l-0">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-mono">{displayItemId}{fractionDisplay}</span>
-                              <span className="text-xs text-gray-600">{stat.item_name}</span>
-                            </div>
-                          </td>
-                          <td className="hidden min-[1800px]:table-cell sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap border-l-0">
-                            <div className="text-sm font-mono">
-                              {displayItemId}{fractionDisplay}
-                            </div>
-                          </td>
-                          <td
-                          className="hidden min-[1800px]:table-cell sticky left-[250px] z-20 bg-white px-6 py-4 whitespace-nowrap max-w-xs border-l-0"
-                          >
-                          <div className="text-sm truncate" title={stat.item_name}>{stat.item_name}</div>
-                          </td>
-                          {stat.hourly_usage.map((count, index) => (
-                          <td
-                            key={`heatmap-cell-${mergeByName ? stat.item_name : stat.item_id}-${index}`}
-                            className="px-2 py-2 whitespace-nowrap text-center text-xs font-mono align-middle"
-                            style={getHeatmapColor(count, maxCount)}
-                          >
-                            <span>
-                              {count > 0 ? count : ''}
-                            </span>
-                          </td>
-                          ))}
-                        </tr>
-                        );
-                      })}
-                      </tbody>
-                    </table>
-                    </div>
+                  return (
+                  <tr key={`heatmap-${mergeByName ? stat.item_name : stat.item_id}`} className="relative">
+                  <td className="sticky left-0 z-20 bg-white px-6 py-4 whitespace-nowrap w-[100px]">
+                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                  {stat.image && stat.image.trim() !== '' ? (
+                  <img
+                  src={stat.image}
+                  alt={stat.item_name}
+                  className="max-h-full max-w-full object-contain"
+                  />
+                  ) : (
+                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                  <Package className="h-6 w-6 text-gray-400" />
+                  </div>
+                  )}
+                  </div>
+                  </td>
+                  <td className="sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap w-[150px] min-[1800px]:hidden border-l-0">
+                  <div className="flex flex-col justify-center h-full">
+                  <div className="text-sm font-mono leading-relaxed py-0.5">{displayItemId}{fractionDisplay}</div>
+                  <div className="text-xs text-gray-600 leading-relaxed py-0.5">{stat.item_name}</div>
+                  </div>
+                  </td>
+                  <td className="hidden min-[1800px]:table-cell sticky left-[100px] z-20 bg-white px-6 py-4 whitespace-nowrap border-l-0">
+                  <div className="text-sm font-mono leading-relaxed py-0.5 flex items-center">
+                  {displayItemId}{fractionDisplay}
+                  </div>
+                  </td>
+                  <td
+                  className="hidden min-[1800px]:table-cell sticky left-[250px] z-20 bg-white px-6 py-4 whitespace-nowrap max-w-xs border-l-0"
+                  >
+                  <div className="text-sm truncate leading-relaxed py-0.5 flex items-center" title={stat.item_name}>{stat.item_name}</div>
+                  </td>
+                  {stat.hourly_usage.map((count, index) => (
+                  <td
+                  key={`heatmap-cell-${mergeByName ? stat.item_name : stat.item_id}-${index}`}
+                  className="px-2 py-3 whitespace-nowrap text-center text-xs font-mono align-middle"
+                  style={getHeatmapColor(count, maxCount)}
+                  >
+                  <span>
+                  {count > 0 ? count : ''}
+                  </span>
+                  </td>
+                  ))}
+                  </tr>
+                  );
+                  })}
+                  </tbody>
+                  </table>
+                  </div>
                   </div>
                   </div>
                 </div>

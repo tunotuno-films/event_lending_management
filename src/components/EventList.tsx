@@ -272,6 +272,7 @@ const itemVariants = {
 
 export default function EventsList() {
   const [events, setEvents] = useState<Event[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
@@ -338,6 +339,7 @@ export default function EventsList() {
       if (error) throw error;
 
       setEvents(data || []);
+      setAllEvents(data || []);
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -345,31 +347,39 @@ export default function EventsList() {
     }
   };
 
-  const handleSearch = async () => {
-    if (searchQuery.trim() === '') {
-      fetchEvents();
-    } else {
-      try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .or(`event_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
-          .eq('event_deleted', false)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setEvents(data || []);
-      } catch (error) {
-        console.error('Error searching events:', error);
-      }
+  // Separate function for performing the actual DB search
+  const performSearch = async () => {
+    if (searchQuery.trim() === '') return; // Should not be called if query is empty
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .or(`event_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
+        .eq('event_deleted', false)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (error) {
+      console.error('Error searching events:', error);
     }
   };
 
+  // useEffect to handle search logic based on searchQuery changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      handleSearch();
+      if (searchQuery.trim() === '') {
+        // Reset to full list only if allEvents is populated
+        if (allEvents.length > 0) {
+          setEvents(allEvents);
+        }
+        // If allEvents is empty, do nothing; fetchEvents might still be running
+        // or has already set the initial events state.
+      } else {
+        performSearch(); // Perform DB search only when query is not empty
+      }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, allEvents]); // Depend on allEvents to ensure it runs after fetchEvents completes
 
   const handleUpdateEvent = async (updatedEvent: Event) => {
     try {

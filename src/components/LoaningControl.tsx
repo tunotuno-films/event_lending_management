@@ -182,25 +182,21 @@ export default function LoaningControl() {
     fetchEvents();
   }, [fetchEvents]);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (isBackgroundRefresh = false) => {
     if (!selectedEventId) return;
 
-    setIsLoadingItems(true); // ローディング開始
-    console.log(`Fetching items and loan count for event: ${selectedEventId}`);
+    if (!isBackgroundRefresh) {
+      setIsLoadingItems(true);
+    }
+    console.log(`Fetching items and loan count for event: ${selectedEventId} (Background: ${isBackgroundRefresh})`);
 
     try {
+      // Fetch data from Supabase
       const { data: controlData, error: controlError } = await supabase
         .from('control')
         .select(`
-          control_id,
-          event_id,
-          item_id,
-          status,
-          control_datetime,
-          item_id_ref,
-          event_id_ref,
-          created_by,
-          items(item_id, name, image)
+          control_id, event_id, item_id, status, control_datetime,
+          item_id_ref, event_id_ref, created_by, items(item_id, name, image)
         `)
         .eq('event_id', selectedEventId);
 
@@ -209,19 +205,61 @@ export default function LoaningControl() {
         throw controlError;
       }
 
-      const formattedData = controlData?.map(item => ({
+      // Format fetched data and create a map for quick lookup
+      const fetchedItems = controlData?.map(item => ({
         ...item,
         items: Array.isArray(item.items) ? item.items[0] : item.items,
         created_by: item.created_by || '',
         events: null
       })) as Control[] || [];
+      const fetchedItemsMap = new Map(fetchedItems.map(item => [item.control_id, item]));
 
-      const waiting = formattedData.filter(item => !item.status);
-      const loaned = formattedData.filter(item => item.status);
+      // --- Update waitingItems state ---
+      setWaitingItems(prevWaitingItems => {
+        // 1. Update existing items and preserve their order
+        const updatedExistingWaiting = prevWaitingItems
+          .filter(item => {
+            const fetchedItem = fetchedItemsMap.get(item.control_id);
+            return fetchedItem && !fetchedItem.status; // Keep if still exists and is waiting
+          })
+          .map(item => fetchedItemsMap.get(item.control_id)!); // Get updated data
 
-      setWaitingItems(waiting);
-      setLoanedItems(loaned);
+        // 2. Find new items that should be in the waiting list
+        const newWaitingItems = fetchedItems.filter(item => {
+          return !item.status && !prevWaitingItems.some(prev => prev.control_id === item.control_id);
+        });
 
+        // 3. Combine: existing items (order preserved) + new items (appended)
+        return [...updatedExistingWaiting, ...newWaitingItems];
+      });
+
+      // --- Update loanedItems state ---
+      setLoanedItems(prevLoanedItems => {
+        // 1. Update existing items and preserve their order
+        const updatedExistingLoaned = prevLoanedItems
+          .filter(item => {
+            const fetchedItem = fetchedItemsMap.get(item.control_id);
+            return fetchedItem && fetchedItem.status; // Keep if still exists and is loaned
+          })
+          .map(item => fetchedItemsMap.get(item.control_id)!); // Get updated data
+
+        // 2. Find new items that should be in the loaned list
+        const newLoanedItems = fetchedItems.filter(item => {
+          return item.status && !prevLoanedItems.some(prev => prev.control_id === item.control_id);
+        });
+        
+        // 3. Combine: existing items (order preserved) + new items (appended)
+        //    Sort newly added items by loan time descending? Or just append? Let's just append for now.
+        newLoanedItems.sort((a, b) => {
+             if (!a.control_datetime || !b.control_datetime) return 0;
+             return new Date(b.control_datetime).getTime() - new Date(a.control_datetime).getTime();
+        });
+
+
+        return [...updatedExistingLoaned, ...newLoanedItems];
+      });
+
+      // --- Update total loan count (no change needed here) ---
       const { count, error: countError } = await supabase
         .from('result')
         .select('*', { count: 'exact', head: true })
@@ -229,6 +267,7 @@ export default function LoaningControl() {
 
       if (countError) {
         console.error('貸出回数取得エラー:', countError);
+        if (!isBackgroundRefresh) setTotalLoanCount(0);
       } else {
         setTotalLoanCount(count ?? 0);
       }
@@ -240,13 +279,17 @@ export default function LoaningControl() {
         message: 'データの取得に失敗しました',
         type: 'error'
       });
-      setWaitingItems([]);
-      setLoanedItems([]);
-      setTotalLoanCount(0);
+      // Avoid clearing items on background refresh error if we have existing data
+      if (!isBackgroundRefresh) {
+          setWaitingItems([]);
+          setLoanedItems([]);
+          setTotalLoanCount(0);
+      }
     } finally {
-      setIsLoadingItems(false); // ローディング終了
+      // Always set loading to false
+      setIsLoadingItems(false);
     }
-  }, [selectedEventId]);
+  }, [selectedEventId]); // Dependency
 
   const handleEventChange = useCallback((selectedOldEventId: string) => {
     setSelectedEventId(selectedOldEventId);
@@ -279,7 +322,7 @@ export default function LoaningControl() {
     if (!selectedEventId) return;
 
     const intervalId = setInterval(() => {
-      fetchItems();
+      fetchItems(true);
     }, 30000);
 
     return () => clearInterval(intervalId);
@@ -321,6 +364,13 @@ export default function LoaningControl() {
 
       if (error) throw error;
 
+      // --- Local state update (Modify Loaned Items) ---
+      const loanedItem = { ...controlRecord, status: true, control_datetime: loanTime };
+      setWaitingItems(prev => prev.filter(item => item.control_id !== controlId));
+      // Add to the beginning of the loanedItems array
+      setLoanedItems(prev => [loanedItem, ...prev]); 
+      // --- End local state update ---
+
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'loan', success: true }
       }));
@@ -331,12 +381,14 @@ export default function LoaningControl() {
         type: 'success'
       });
 
-      fetchItems();
-      setBarcodeInput('');
-      setMatchingItems([]);
+      // Clear modal state if the action originated from a modal
+      if (showBarcodeModal || showItemIdModal) {
+        setBarcodeInput('');
+        setMatchingItems([]);
+        setShowBarcodeModal(false);
+        setShowItemIdModal(false);
+      }
       
-      setShowBarcodeModal(false);
-      setShowItemIdModal(false);
     } catch (error) {
       console.error('貸出処理エラー:', error);
       setNotification({
@@ -382,10 +434,18 @@ export default function LoaningControl() {
 
       if (updateError) throw updateError;
 
+      // --- Local state update (Modify Waiting Items) ---
+      const returnedItem = { ...controlRecord, status: false, control_datetime: null };
+      setLoanedItems(prev => prev.filter(item => item.control_id !== controlId));
+      // Add to the beginning of the waitingItems array
+      setWaitingItems(prev => [returnedItem, ...prev]); 
+      // --- End local state update ---
+
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'return', success: true }
       }));
 
+      let historyRecorded = false;
       if (loanTime && oldItemId && oldEventId) {
         try {
           const { error: resultError } = await insertWithOwnerId(
@@ -399,9 +459,10 @@ export default function LoaningControl() {
               end_datetime: returnTime
             }
           );
-
           if (resultError) {
             console.error('履歴記録エラー:', resultError);
+          } else {
+            historyRecorded = true; // 履歴記録成功
           }
         } catch (historyError) {
           console.error('履歴記録中にエラーが発生:', historyError);
@@ -412,18 +473,24 @@ export default function LoaningControl() {
         });
       }
 
+      if (historyRecorded) {
+        setTotalLoanCount(prev => prev + 1);
+      }
+
       setNotification({
         show: true,
         message: `アイテム「${oldItemId || 'ID不明'}」を返却しました`,
         type: 'success'
       });
 
-      fetchItems();
-      setBarcodeInput('');
-      setMatchingItems([]);
+      // Clear modal state if the action originated from a modal
+      if (showBarcodeModal || showItemIdModal) {
+        setBarcodeInput('');
+        setMatchingItems([]);
+        setShowBarcodeModal(false);
+        setShowItemIdModal(false);
+      }
       
-      setShowBarcodeModal(false);
-      setShowItemIdModal(false);
     } catch (error) {
       console.error('返却処理エラー:', error);
       setNotification({

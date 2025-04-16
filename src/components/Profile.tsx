@@ -88,6 +88,10 @@ const Profile: React.FC<ProfileProps> = ({ userEmail }) => {
         message: 'プロフィールが更新されました',
         type: 'success'
       });
+      // 新しい名前でカスタムイベントを発行
+      const event = new CustomEvent('userNameUpdated', { detail: { newName: name } });
+      window.dispatchEvent(event);
+
       setTimeout(() => {
         setNotification(prev => ({ ...prev, show: false }));
       }, 3000);

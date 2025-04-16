@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase';
 import { AlertCircle, X, Package } from 'lucide-react';
 import LoadingIndicator from './LoadingIndicator';
+import { motion } from 'framer-motion';
 
 interface Event {
   id: number;
@@ -41,6 +42,28 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
       </button>
     </div>
   );
+};
+
+// Animation variants (same as other lists)
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05 // Adjust delay between items
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3 // Adjust animation duration
+    }
+  }
 };
 
 export default function EventDaily() {
@@ -430,9 +453,18 @@ export default function EventDaily() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <motion.tbody
+                  className="bg-white divide-y divide-gray-200"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {sortedItems.map((item) => (
-                    <tr key={item.item_id} className={`hover:bg-gray-50 ${selectedItemIds.includes(item.item_id) ? 'bg-blue-100' : ''}`}>
+                    <motion.tr
+                      key={item.item_id}
+                      className={`hover:bg-gray-50 ${selectedItemIds.includes(item.item_id) ? 'bg-blue-100' : ''}`}
+                      variants={itemVariants}
+                    >
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
@@ -468,9 +500,9 @@ export default function EventDaily() {
                           {item.manager}
                         </span>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
-                </tbody>
+                </motion.tbody>
               </table>
             </div>
           )}

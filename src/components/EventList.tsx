@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Pencil, Trash2, X, AlertCircle, Undo2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LoadingIndicator from './LoadingIndicator';
+import { motion } from 'framer-motion';
 
 interface Event {
   event_id: string;
@@ -245,6 +246,28 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
       </div>
     </div>
   );
+};
+
+// Animation variants (same as ItemList)
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05 // Adjust delay between items
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3 // Adjust animation duration
+    }
+  }
 };
 
 export default function EventsList() {
@@ -500,12 +523,18 @@ export default function EventsList() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <motion.tbody
+              className="bg-white divide-y divide-gray-200"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {sortedEvents.map((event) => (
-                <tr 
+                <motion.tr 
                   key={event.event_id} 
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => setSelectedForNavigation(event)}
+                  variants={itemVariants}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-mono text-gray-900">{event.event_id}</div>
@@ -532,9 +561,9 @@ export default function EventsList() {
                       <Trash2 size={16} />
                     </button>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
-            </tbody>
+            </motion.tbody>
           </table>
         )}
       </div>

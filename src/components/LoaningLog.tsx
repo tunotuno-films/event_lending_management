@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
 import { AlertCircle, X, Download, Clock, Package } from 'lucide-react';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
+import { motion } from 'framer-motion'; // Import motion
 
 interface Event {
   event_id: string;
@@ -67,6 +68,28 @@ const Notification: React.FC<NotificationProps> = ({ message, onClose, type = 's
       </div>
     </div>
   );
+};
+
+// Animation variants (same as other lists)
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05 // Adjust delay between items
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3 // Adjust animation duration
+    }
+  }
 };
 
 export default function LoaningLog() {
@@ -621,7 +644,12 @@ export default function LoaningLog() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <motion.tbody
+                  className="bg-white divide-y divide-gray-200"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {sortedLoanRecords.map((record) => {
                     const item = record.item || record.items;
                     const imageUrl = item?.image;
@@ -631,7 +659,11 @@ export default function LoaningLog() {
                     const durationStr = formatLoanDuration(record.start_datetime, record.end_datetime);
 
                     return (
-                      <tr key={record.result_id} className="hover:bg-gray-50">
+                      <motion.tr
+                        key={record.result_id}
+                        className="hover:bg-gray-50"
+                        variants={itemVariants}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
                             {imageUrl && imageUrl.trim() !== '' ? (
@@ -673,10 +705,10 @@ export default function LoaningLog() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-700">{durationStr}</span>
                         </td>
-                      </tr>
+                      </motion.tr>
                     );
                   })}
-                </tbody>
+                </motion.tbody>
               </table>
             </div>
           )}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, formatJSTDateTime } from '../lib/supabase';
-import { AlertCircle, X, Download, Clock, Package } from 'lucide-react';
+import { AlertCircle, X, Clock, Package } from 'lucide-react';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 import { motion } from 'framer-motion'; // Import motion
+import DownloadButton from './DownloadButton'; // DownloadButton をインポート
 
 interface Event {
   event_id: string;
@@ -575,13 +576,9 @@ export default function LoaningLog() {
               </button>
             </div>
             <div>
-              <button
-                onClick={downloadCSV}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-2"
-              >
-                <Download size={16} />
-                CSVダウンロード
-              </button>
+              <DownloadButton 
+                onAnimationComplete={async () => downloadCSV()}
+              />
             </div>
           </div>
 

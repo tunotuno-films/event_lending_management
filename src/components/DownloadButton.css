@@ -22,34 +22,35 @@
     overflow: hidden;
     text-decoration: none;
     background: var(--background);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px -1px var(--shadow);
+    border-radius: 6px;
+    box-shadow: 0 2px 6px -1px var(--shadow);
     transition: transform .2s ease, box-shadow .2s ease;
     cursor: pointer;
     -webkit-mask-image: -webkit-radial-gradient(white, black); /* 必要であれば */
+    mask-image: radial-gradient(white, black); /* 標準プロパティを追加 */
     position: relative;
-    height: 60px;
+    height: 48px;
     user-select: none;
 }
 
 .button:active {
     transform: scale(.95);
-    box-shadow: 0 1px 4px -1px var(--shadow);
+    box-shadow: 0 1px 3px -1px var(--shadow);
 }
 
 .button ul {
     margin: 0;
-    padding: 0 40px;
+    padding: 0 32px;
     list-style: none;
     text-align: center;
     position: relative;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
-    line-height: 60px;
+    line-height: 48px;
     color: var(--text);
-    width: 180px; /* 130pxから拡大して幅を広げる */
-    overflow: hidden; /* liがはみ出ないように */
-    height: 60px;
+    width: 144px;
+    overflow: hidden;
+    height: 48px;
 }
 
 .button li {
@@ -58,10 +59,10 @@
     left: 0;
     right: 0;
     height: 100%;
-    line-height: 60px;
+    line-height: 48px;
     opacity: 0;
     transition: opacity 0.3s ease;
-    pointer-events: none; /* 重なっていてもクリックイベントを透過 */
+    pointer-events: none;
 }
 
 /* ステータスに応じたテキスト表示 */
@@ -79,8 +80,8 @@
 
 .button > div {
     position: relative;
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     background: var(--rectangle);
     overflow: hidden;
 }
@@ -93,8 +94,8 @@
     width: 2px;
     top: 50%;
     left: 50%;
-    height: 17px;
-    margin: -9px 0 0 -1px;
+    height: 14px;
+    margin: -7px 0 0 -1px;
     background: var(--arrow);
     transition: transform 0.3s ease, opacity 0.3s ease;
     transform: translateY(0);
@@ -104,13 +105,13 @@
 .button > div svg {
     display: block;
     position: absolute;
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
     fill: none;
-    z-index: 2; /* z-indexを追加して背景の上に表示 */
+    z-index: 2;
     stroke-width: 2px;
     stroke: var(--arrow);
     stroke-linecap: round;
@@ -119,12 +120,11 @@
 }
 
 .button.loading > div::before {
-     opacity: 0; /* ローディング中は線を消す */
-     transform: translateY(10px); /* 少し下に移動させる演出など */
+     opacity: 0;
+     transform: translateY(10px);
 }
 
 .button.loading > div svg path {
-    /* GSAPが d 属性を変更 */
     stroke: var(--arrow);
 }
 
@@ -135,7 +135,6 @@
 
 .button.done > div svg path {
     stroke: var(--checkmark);
-    /* GSAPが d 属性をチェックマークに変更済み */
     stroke-dasharray: none;
     stroke-dashoffset: 0;
 }

@@ -467,18 +467,30 @@ export default function LoaningLog() {
     }
   };
 
-  const downloadCSV = () => {
-    if (loanRecords.length === 0) return;
+  // Function to generate CSV data and filename
+  const generateLoaningLogCsvData = (): { data: Blob, filename: string } | null => {
+    if (loanRecords.length === 0) {
+      setNotification({
+        show: true,
+        message: 'ダウンロードするデータがありません',
+        type: 'info'
+      });
+      return null;
+    }
 
     const headers = ['物品ID', '物品名', '貸出時間', '返却時間', '貸出時間(秒)'];
     const csvData = loanRecords.map(record => {
       let durationInSeconds = '-';
-
       if (record.start_datetime && record.end_datetime) {
-        const start = new Date(record.start_datetime).getTime();
-        const end = new Date(record.end_datetime).getTime();
-        const durationSec = Math.max(0, (end - start) / 1000);
-        durationInSeconds = durationSec.toFixed(0);
+        try {
+          const start = new Date(record.start_datetime).getTime();
+          const end = new Date(record.end_datetime).getTime();
+          const durationSec = Math.max(0, (end - start) / 1000);
+          durationInSeconds = durationSec.toFixed(0);
+        } catch (e) {
+          console.error("Error calculating duration for CSV:", e);
+          durationInSeconds = '計算エラー';
+        }
       }
 
       return [
@@ -487,7 +499,7 @@ export default function LoaningLog() {
         formatJSTDateTime(record.start_datetime),
         record.end_datetime ? formatJSTDateTime(record.end_datetime) : '未返却',
         durationInSeconds
-      ];
+      ].map(value => `"${String(value).replace(/"/g, '""')}"`); // Escape values
     });
 
     const csvContent = [
@@ -495,9 +507,7 @@ export default function LoaningLog() {
       ...csvData.map(row => row.join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
 
     const today = new Date();
     const yyyy = today.getFullYear().toString();
@@ -505,15 +515,11 @@ export default function LoaningLog() {
     const dd = today.getDate().toString().padStart(2, '0');
     const dateString = `${yyyy}${mm}${dd}`;
     const selectedEvent = events.find(e => e.event_id === selectedEventId);
-    const fileName = selectedEvent 
+    const filename = selectedEvent 
       ? `${dateString}_貸出履歴_${selectedEvent.event_id}-${selectedEvent.name}.csv`
       : `${dateString}_貸出履歴.csv`;
-    link.download = fileName;
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    return { data: blob, filename };
   };
 
   const formatTimeOnly = (dateTimeString: string | null): string => {
@@ -577,7 +583,8 @@ export default function LoaningLog() {
             </div>
             <div>
               <DownloadButton 
-                onAnimationComplete={async () => downloadCSV()}
+                onGenerateData={async () => generateLoaningLogCsvData()}
+                idleText="CSVダウンロード"
               />
             </div>
           </div>

@@ -518,45 +518,32 @@ export default function ItemList() {
     return value;
   };
 
-  // CSVエクスポート処理の実装を修正
-  const handleCSVExport = async (): Promise<void> => {
-    return new Promise<void>((resolve) => {
+  // Modified CSV data generation function for DownloadButton
+  const generateCSVDataForButton = async (): Promise<{ data: Blob, filename: string } | null> => {
+    try {
       let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
       sortedItems.forEach(item => {
         csv += `${item.item_id},${escapeCSV(item.name)},${escapeCSV(item.genre)},${escapeCSV(item.manager)},${formatDate(item.registered_date)}\n`;
       });
       const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      // ファイル名をyyyyMMdd_物品一覧.csv形式で作成
+
       const today = new Date();
       const yyyy = today.getFullYear().toString();
       const mm = (today.getMonth() + 1).toString().padStart(2, '0');
       const dd = today.getDate().toString().padStart(2, '0');
-      a.download = `${yyyy}${mm}${dd}_物品一覧.csv`;
-      
-      document.body.appendChild(a);
-      a.click();
-      
-      // リソースのクリーンアップと解決
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        resolve(); // ダウンロード処理の完了を通知
-      }, 100);
-    });
-  };
+      const filename = `${yyyy}${mm}${dd}_物品一覧.csv`;
 
-  // ダウンロード完了と通知表示を行う関数
-  const handleDownloadComplete = () => {
-    // 成功通知を表示
-    setNotification({
-      show: true,
-      message: `CSVファイルのダウンロードが完了しました`,
-      type: 'success'
-    });
+      // Return data and filename instead of triggering download
+      return { data: blob, filename };
+    } catch (error) {
+      console.error("Error generating CSV data:", error);
+      setNotification({
+        show: true,
+        message: 'CSVデータの生成に失敗しました',
+        type: 'error'
+      });
+      return null; // Indicate failure
+    }
   };
 
   return (
@@ -575,8 +562,8 @@ export default function ItemList() {
         <h2 className="text-xl font-semibold">登録物品一覧</h2>
         <div className="flex gap-2">
             <DownloadButton 
-              onAnimationComplete={handleCSVExport} 
-              onDownloadComplete={handleDownloadComplete} 
+              onGenerateData={generateCSVDataForButton}
+              idleText="CSVダウンロード"
             />
         </div>
       </div>

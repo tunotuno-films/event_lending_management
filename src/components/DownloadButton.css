@@ -1,140 +1,140 @@
-/* DownloadButton.css */
-.download-button-container {
-    /* コンテナが必要な場合のスタイル */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
+    /* DownloadButton.css */
+    .download-button-container {
+        /* コンテナが必要な場合のスタイル */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
 
-.button {
-    --background: #275efe;
-    --rectangle: #184fee;
-    /* --success: color-mix(in srgb, white 20%, #184fee); CSS Color Module 5 (ブラウザサポート注意) */
-    --success: #5c81f1; /* 混合色の近似値 */
-    --text: #fff;
-    --arrow: #fff;
-    --checkmark: #fff;
-    --shadow: rgba(10, 22, 50, .24);
-    /* --duration は JS/TS から設定 */
+    .button {
+        --background: #275efe;
+        --rectangle: #184fee;
+        /* --success: color-mix(in srgb, white 20%, #184fee); CSS Color Module 5 (ブラウザサポート注意) */
+        --success: #5c81f1; /* 混合色の近似値 */
+        --text: #fff;
+        --arrow: #fff;
+        --checkmark: #fff;
+        --shadow: rgba(10, 22, 50, .24);
+        /* --duration は JS/TS から設定 */
 
-    display: flex;
-    overflow: hidden;
-    text-decoration: none;
-    background: var(--background);
-    border-radius: 6px;
-    box-shadow: 0 2px 6px -1px var(--shadow);
-    transition: transform .2s ease, box-shadow .2s ease;
-    cursor: pointer;
-    -webkit-mask-image: -webkit-radial-gradient(white, black); /* 必要であれば */
-    mask-image: radial-gradient(white, black); /* 標準プロパティを追加 */
-    position: relative;
-    height: 48px;
-    user-select: none;
-}
+        display: flex;
+        overflow: hidden;
+        text-decoration: none;
+        background: var(--background);
+        border-radius: 6px;
+        box-shadow: 0 2px 6px -1px var(--shadow);
+        transition: transform .2s ease, box-shadow .2s ease;
+        cursor: pointer;
+        -webkit-mask-image: -webkit-radial-gradient(white, black); /* 必要であれば */
+        mask-image: radial-gradient(white, black); /* 標準プロパティを追加 */
+        position: relative;
+        height: 48px;
+        user-select: none;
+    }
 
-.button:active {
-    transform: scale(.95);
-    box-shadow: 0 1px 3px -1px var(--shadow);
-}
+    .button:active {
+        transform: scale(.95);
+        box-shadow: 0 1px 3px -1px var(--shadow);
+    }
 
-.button ul {
-    margin: 0;
-    padding: 0 32px;
-    list-style: none;
-    text-align: center;
-    position: relative;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 48px;
-    color: var(--text);
-    width: 144px;
-    overflow: hidden;
-    height: 48px;
-}
+    .button ul {
+        margin: 0;
+        padding: 0 32px;
+        list-style: none;
+        text-align: center;
+        position: relative;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 48px;
+        color: var(--text);
+        width: 144px;
+        overflow: hidden;
+        height: 48px;
+    }
 
-.button li {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    line-height: 48px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
+    .button li {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100%;
+        line-height: 48px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
 
-/* ステータスに応じたテキスト表示 */
-.button.idle li:nth-child(1),
-.button:not(.loading):not(.done) li:nth-child(1) {
-    opacity: 1;
-}
-.button.loading li:nth-child(2) {
-    opacity: 1;
-}
-.button.done li:nth-child(3) {
-    opacity: 1;
-}
+    /* ステータスに応じたテキスト表示 */
+    .button.idle li:nth-child(1),
+    .button:not(.loading):not(.done) li:nth-child(1) {
+        opacity: 1;
+    }
+    .button.loading li:nth-child(2) {
+        opacity: 1;
+    }
+    .button.done li:nth-child(3) {
+        opacity: 1;
+    }
 
 
-.button > div {
-    position: relative;
-    width: 48px;
-    height: 48px;
-    background: var(--rectangle);
-    overflow: hidden;
-}
+    .button > div {
+        position: relative;
+        width: 48px;
+        height: 48px;
+        background: var(--rectangle);
+        overflow: hidden;
+    }
 
-.button > div::before { /* Arrow line */
-    content: '';
-    display: block;
-    position: absolute;
-    border-radius: 1px;
-    width: 2px;
-    top: 50%;
-    left: 50%;
-    height: 14px;
-    margin: -7px 0 0 -1px;
-    background: var(--arrow);
-    transition: transform 0.3s ease, opacity 0.3s ease;
-    transform: translateY(0);
-    opacity: 1;
-}
+    .button > div::before { /* Arrow line */
+        content: '';
+        display: block;
+        position: absolute;
+        border-radius: 1px;
+        width: 2px;
+        top: 50%;
+        left: 50%;
+        height: 14px;
+        margin: -7px 0 0 -1px;
+        background: var(--arrow);
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        transform: translateY(0);
+        opacity: 1;
+    }
 
-.button > div svg {
-    display: block;
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    fill: none;
-    z-index: 2;
-    stroke-width: 2px;
-    stroke: var(--arrow);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    transition: opacity 0.3s ease;
-}
+    .button > div svg {
+        display: block;
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        fill: none;
+        z-index: 2;
+        stroke-width: 2px;
+        stroke: var(--arrow);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: opacity 0.3s ease;
+    }
 
-.button.loading > div::before {
-     opacity: 0;
-     transform: translateY(10px);
-}
+    .button.loading > div::before {
+        opacity: 0;
+        transform: translateY(10px);
+    }
 
-.button.loading > div svg path {
-    stroke: var(--arrow);
-}
+    .button.loading > div svg path {
+        stroke: var(--arrow);
+    }
 
-/* Done state styles */
-.button.done > div::before {
-    opacity: 0;
-}
+    /* Done state styles */
+    .button.done > div::before {
+        opacity: 0;
+    }
 
-.button.done > div svg path {
-    stroke: var(--checkmark);
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
-}
+    .button.done > div svg path {
+        stroke: var(--checkmark);
+        stroke-dasharray: none;
+        stroke-dashoffset: 0;
+    }

@@ -332,12 +332,14 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                {/* 状態カラムの幅を w-16 に変更 */}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                   状態
                 </th>
                 <th
                   onClick={() => handleSort('item_id')}
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6 ${
+                  // 幅指定を削除
+                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'item_id'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -347,7 +349,8 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 </th>
                 <th
                   onClick={() => handleSort('name')}
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6 ${
+                  // 幅指定を削除
+                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'name'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -357,7 +360,8 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 </th>
                 <th
                   onClick={() => handleSort('genre')}
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6 ${
+                  // 幅指定を削除
+                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'genre'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -367,7 +371,8 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 </th>
                 <th
                   onClick={() => handleSort('manager')}
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6 ${
+                  // 幅指定を削除
+                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'manager'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -375,7 +380,8 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 >
                   管理者 {sortColumn === 'manager' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/6">
+                {/* エラー内容カラムの幅指定を削除 */}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   エラー内容
                 </th>
               </tr>
@@ -394,6 +400,7 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                   className={item.isValid ? '' : 'bg-red-50'}
                   variants={itemVariants}
                 >
+                  {/* 状態カラムのセル */}
                   <td className="px-4 py-3 whitespace-nowrap text-center">
                     {item.isValid ? (
                       <CheckCircle className="h-5 w-5 text-green-500 inline-block" />
@@ -401,10 +408,21 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                       <AlertCircle className="h-5 w-5 text-red-500 inline-block" />
                     )}
                   </td>
+                  {/* 他のカラムのセル */}
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-700">{item.item_id || '-'}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.name || '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.genre || '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.manager || '-'}</td>
+                  {/* ジャンルカラムの表示をバッジスタイルに変更 */}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {item.genre || '-'}
+                    </span>
+                  </td>
+                  {/* 管理者カラムの表示をバッジスタイルに変更 */}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                      {item.manager || '-'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     {item.errors.length > 0 ? (
                       <ul className="list-disc list-inside text-red-600 space-y-1">

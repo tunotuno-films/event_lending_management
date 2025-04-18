@@ -1,10 +1,28 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-// Package アイコンをインポート
-import { Pencil, Trash2, X, AlertCircle, Undo2, Package } from 'lucide-react'; // Package を追加
-import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
-import DownloadButton from './DownloadButton'; // DownloadButton を再追加
-import { motion } from 'framer-motion'; // Import motion
+import { Pencil, Trash2, X, AlertCircle, Undo2, Package } from 'lucide-react';
+import LoadingIndicator from './LoadingIndicator';
+import DownloadButton from './DownloadButton';
+import { motion } from 'framer-motion';
+
+// デフォルト画像定数を追加
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
+
+// 画像URLのヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return DEFAULT_IMAGE;
+
+  // 空文字やundefinedの場合
+  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
+
+  // 有効なURLでない場合
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
+};
 
 interface Item {
   item_id: string;
@@ -118,12 +136,13 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     customGenre: '',
     manager: item.manager,
     customManager: '',
-    image: null as File | null
+    image: null as File | null,
+    imagePreview: item.image || '' // 画像プレビュー用の状態を追加
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       let imageUrl = item.image;
 
@@ -164,9 +183,18 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     }
   };
 
+  // 画像選択時のハンドラーを改善してプレビュー機能を追加
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({ ...prev, image: e.target.files![0] }));
+      const file = e.target.files[0];
+
+      // 画像をFormDataにセット
+      setFormData(prev => ({
+        ...prev,
+        image: file,
+        // 画像プレビューのためのURL生成
+        imagePreview: URL.createObjectURL(file)
+      }));
     }
   };
 
@@ -198,19 +226,13 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                {item.image && item.image.trim() !== '' ? (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                    <Package className="h-10 w-10 text-gray-400" />
-                  </div>
-                )}
-              </div>
+              {/* 画像プレビューを改善 */}
+              <img
+                src={formData.imagePreview || getItemImageUrl(item.image)}
+                alt={item.name}
+                className="h-20 w-20 object-cover rounded-lg"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+              />
               <input
                 type="file"
                 accept="image/*"
@@ -341,7 +363,7 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
-  
+
   const [sortConfig, setSortConfig] = useState<{ key: keyof Item | 'item_info' | 'details'; direction: 'asc' | 'desc' } | null>({ key: 'item_id', direction: 'asc' });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
@@ -510,7 +532,7 @@ export default function ItemList() {
       if (error) throw error;
 
       fetchItems();
-      
+
       setNotification({
         show: true,
         message: `物品ID[${updatedItem.item_id}]を更新しました`,
@@ -537,7 +559,7 @@ export default function ItemList() {
 
       fetchItems();
       setDeletingItem(null);
-      
+
       setNotification({
         show: true,
         message: `物品ID[${item.item_id}]を削除しました`,
@@ -566,7 +588,7 @@ export default function ItemList() {
       if (error) throw error;
 
       fetchItems();
-      
+
       setNotification({
         show: true,
         message: `物品ID[${notification.lastDeletedItem.item_id}]の削除を取り消しました`,
@@ -693,18 +715,17 @@ export default function ItemList() {
           showUndo={notification.lastDeletedItem !== undefined}
         />
       )}
-  
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">登録物品一覧</h2>
         <div className="flex gap-2">
-            {/* ダウンロードボタンを元の実装に戻す */}
-            <DownloadButton 
-              onGenerateData={generateCSVDataForButton}
-              idleText="CSVダウンロード"
-            />
+          <DownloadButton
+            onGenerateData={generateCSVDataForButton}
+            idleText="CSVダウンロード"
+          />
         </div>
       </div>
-  
+
       <div className="mb-4">
         <input
           type="text"
@@ -714,7 +735,7 @@ export default function ItemList() {
           className="w-full border border-gray-300 rounded-md p-2"
         />
       </div>
-  
+
       <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
         <table className="w-full min-w-[800px] divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -773,14 +794,14 @@ export default function ItemList() {
             </tr>
           </thead>
           <motion.tbody
-              className="bg-white divide-y divide-gray-200"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-            >
+            className="bg-white divide-y divide-gray-200"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {sortedItems.map((item) => (
-              <motion.tr 
-                key={item.item_id} 
+              <motion.tr
+                key={item.item_id}
                 className="hover:bg-gray-50 align-middle"
                 variants={itemVariants}
               >
@@ -791,6 +812,7 @@ export default function ItemList() {
                         src={item.image}
                         alt={item.name}
                         className="max-h-full max-w-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                       />
                     ) : (
                       <div className="h-full w-full bg-gray-50 flex items-center justify-center">
@@ -857,7 +879,7 @@ export default function ItemList() {
           </motion.tbody>
         </table>
       </div>
-  
+
       {editingItem && (
         <EditModal
           item={editingItem}
@@ -867,7 +889,7 @@ export default function ItemList() {
           managers={managers}
         />
       )}
-  
+
       {deletingItem && (
         <DeleteConfirmModal
           item={deletingItem}

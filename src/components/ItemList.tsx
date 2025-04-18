@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react'; // Download を削除
+// Package アイコンをインポート
+import { Pencil, Trash2, X, AlertCircle, Undo2, Package } from 'lucide-react'; 
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 import DownloadButton from './DownloadButton'; // DownloadButton をインポート
 import { motion } from 'framer-motion'; // Import motion
-
-const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Item {
   item_id: string;
@@ -199,12 +198,19 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <img
-                src={getItemImageUrl(item.image)}
-                alt={item.name}
-                className="h-20 w-20 object-cover rounded-lg"
-                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-              />
+              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                {item.image && item.image.trim() !== '' ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                    <Package className="h-10 w-10 text-gray-400" />
+                  </div>
+                )}
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -302,23 +308,6 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   );
 };
 
-// 画像URLのヘルパー関数を追加
-const getItemImageUrl = (imageUrl: string | null): string => {
-  if (!imageUrl) return DEFAULT_IMAGE;
-  
-  // 空文字やundefinedの場合
-  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
-  
-  // 有効なURLでない場合
-  try {
-    new URL(imageUrl);
-    return imageUrl;
-  } catch (e) {
-    return DEFAULT_IMAGE;
-  }
-};
-
-// Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -352,11 +341,9 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
-  // 初期値を item_id の昇順に設定
   const [sortColumn, setSortColumn] = useState<string>('item_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // ソート状態に基づいてitemsを整列
   const sortedItems = useMemo(() => {
     if (!sortColumn) return items;
     return items.slice().sort((a, b) => {
@@ -419,7 +406,7 @@ export default function ItemList() {
         .from('items')
         .update({
           name: updatedItem.name,
-          image: updatedItem.image || null, // 空文字列の場合はnullに
+          image: updatedItem.image || null,
           genre: updatedItem.genre,
           manager: updatedItem.manager
         })
@@ -509,7 +496,6 @@ export default function ItemList() {
     });
   };
 
-  // CSV用エスケープ関数を修正：nullの場合は空文字を返す
   const escapeCSV = (value: string | null): string => {
     if (!value) return '';
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -518,7 +504,6 @@ export default function ItemList() {
     return value;
   };
 
-  // Modified CSV data generation function for DownloadButton
   const generateCSVDataForButton = async (): Promise<{ data: Blob, filename: string } | null> => {
     try {
       let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
@@ -533,7 +518,6 @@ export default function ItemList() {
       const dd = today.getDate().toString().padStart(2, '0');
       const filename = `${yyyy}${mm}${dd}_物品一覧.csv`;
 
-      // Return data and filename instead of triggering download
       return { data: blob, filename };
     } catch (error) {
       console.error("Error generating CSV data:", error);
@@ -542,7 +526,7 @@ export default function ItemList() {
         message: 'CSVデータの生成に失敗しました',
         type: 'error'
       });
-      return null; // Indicate failure
+      return null;
     }
   };
 
@@ -569,12 +553,11 @@ export default function ItemList() {
       </div>
   
       <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
-        {/* テーブル表示前にローディング状態をチェック */}
         {loading ? (
           <div className="flex justify-center items-center min-h-[200px]">
             <LoadingIndicator />
           </div>
-        ) : items.length === 0 ? ( // ローディング完了後、アイテムがない場合の表示
+        ) : items.length === 0 ? (
           <div className="text-center py-10 text-gray-500">
             登録されている物品はありません。
           </div>
@@ -633,7 +616,6 @@ export default function ItemList() {
                 </th>
               </tr>
             </thead>
-            {/* Apply motion.tbody and variants */}
             <motion.tbody
               className="bg-white divide-y divide-gray-200"
               variants={containerVariants}
@@ -641,20 +623,24 @@ export default function ItemList() {
               animate="visible"
             >
               {sortedItems.map((item) => (
-                // Apply motion.tr and variants to each row
                 <motion.tr
                   key={item.item_id}
                   className="hover:bg-gray-50 align-middle"
-                  variants={itemVariants} // Removed layout prop for simpler animation
+                  variants={itemVariants}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                      <img
-                        src={getItemImageUrl(item.image)}
-                        alt={item.name}
-                        className="max-h-full max-w-full object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                      />
+                    <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                      {item.image && item.image.trim() !== '' ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                          <Package className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -699,7 +685,6 @@ export default function ItemList() {
         )}
       </div>
   
-      {/* モーダル部分 */}
       {editingItem && (
         <EditModal
           item={editingItem}

@@ -484,7 +484,7 @@ export default function LoaningStatistics() {
   const totalMinuteUsage = useMemo(() => {
     const totals = new Array(24 * 6).fill(0);
     loanRecords.forEach(record => {
-       if (record.start_datetime) { // Check if start_datetime exists
+      if (record.start_datetime) { // Check if start_datetime exists
         try {
             const startDate = new Date(record.start_datetime);
             const hour = startDate.getHours();
@@ -496,7 +496,7 @@ export default function LoaningStatistics() {
           } catch (e) {
             console.error("Error parsing start_datetime:", record.start_datetime, e);
           }
-       }
+      }
     });
     return totals;
   }, [loanRecords]);
@@ -562,7 +562,7 @@ export default function LoaningStatistics() {
     let lastIndex = -1;
     topItemsHourlyUsage.usageData.forEach((usage) => {
       const first = usage.findIndex(count => count > 0);
-       if (first !== -1) {
+      if (first !== -1) {
             if (firstIndex === -1 || first < firstIndex) {
                 firstIndex = first;
             }
@@ -576,7 +576,7 @@ export default function LoaningStatistics() {
             }
         }
     });
-     const validLastIndex = (lastIndex >= firstIndex) ? lastIndex : firstIndex;
+    const validLastIndex = (lastIndex >= firstIndex) ? lastIndex : firstIndex;
     return { firstIndex, lastIndex: validLastIndex };
   }, [topItemsHourlyUsage.usageData]);
 

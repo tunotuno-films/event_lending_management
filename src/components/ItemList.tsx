@@ -1,13 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 // Package アイコンをインポート
-import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react'; // Download を削除して Package を追加
+import { Pencil, Trash2, X, AlertCircle, Undo2, Package } from 'lucide-react'; // Package を追加
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 import DownloadButton from './DownloadButton'; // DownloadButton を再追加
 import { motion } from 'framer-motion'; // Import motion
-
-// デフォルト画像を定義
-const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Item {
   item_id: string;
@@ -17,22 +14,6 @@ interface Item {
   manager: string;
   registered_date: string;
 }
-
-// 画像URLのヘルパー関数を追加
-const getItemImageUrl = (imageUrl: string | null): string => {
-  if (!imageUrl) return DEFAULT_IMAGE;
-  
-  // 空文字やundefinedの場合
-  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
-  
-  // 有効なURLでない場合
-  try {
-    new URL(imageUrl);
-    return imageUrl;
-  } catch (e) {
-    return DEFAULT_IMAGE;
-  }
-};
 
 interface NotificationProps {
   message: string;
@@ -217,12 +198,19 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <img
-                src={getItemImageUrl(item.image)}
-                alt={item.name}
-                className="h-20 w-20 object-cover rounded-lg"
-                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-              />
+              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                {item.image && item.image.trim() !== '' ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                    <Package className="h-10 w-10 text-gray-400" />
+                  </div>
+                )}
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -797,13 +785,18 @@ export default function ItemList() {
                 variants={itemVariants}
               >
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                    <img
-                      src={getItemImageUrl(item.image)}
-                      alt={item.name}
-                      className="max-h-full max-w-full object-contain"
-                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-                    />
+                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                    {item.image && item.image.trim() !== '' ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                        <Package className="h-6 w-6 text-gray-400" />
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 min-[1800px]:hidden">

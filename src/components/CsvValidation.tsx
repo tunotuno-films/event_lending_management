@@ -70,15 +70,17 @@ const itemVariants = {
 
 const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
   const navigate = useNavigate();
-  // items 状態の型を CsvItem[] に指定
   const [items, setItems] = useState<CsvItem[]>([]);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
-  const [isProcessing, setIsProcessing] = useState(false); // 登録処理中フラグ
-  const [isValidating, setIsValidating] = useState(false); // バリデーション中フラグ
-  const [sortColumn, setSortColumn] = useState<string>('item_id');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   
-  // 画面幅の状態を追加
+  // ソート状態の型を変更して、物品一覧と同様に扱えるようにする
+  const [sortConfig, setSortConfig] = useState<{ key: string | 'item_info' | 'details'; direction: 'asc' | 'desc' }>({ 
+    key: 'item_id', 
+    direction: 'asc' 
+  });
+  
   const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
 
   // リサイズ検知のためのイベントリスナー
@@ -90,17 +92,29 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 並び替え済みの items を生成
+  // ソート済みアイテムの計算ロジックを変更
   const sortedItems = useMemo(() => {
     if (!items.length) return items;
+    
+    // 実際に使うソートキーを決定
+    let sortKey = sortConfig.key;
+    if (sortConfig.key === 'item_info' || sortConfig.key === 'details') {
+      // 横幅が狭い場合の特別な処理
+      if (sortConfig.key === 'item_info') {
+        sortKey = sortConfig.key === 'item_info' ? 'item_id' : sortKey; // デフォルトはitem_id
+      } else if (sortConfig.key === 'details') {
+        sortKey = sortConfig.key === 'details' ? 'genre' : sortKey; // デフォルトはgenre
+      }
+    }
+    
     return items.slice().sort((a, b) => {
-      const aVal = (a as any)[sortColumn] as string;
-      const bVal = (b as any)[sortColumn] as string;
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      const aVal = (a as any)[sortKey] as string;
+      const bVal = (b as any)[sortKey] as string;
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [items, sortColumn, sortDirection]);
+  }, [items, sortConfig]);
 
   // --- バリデーション関数 (useCallbackでラップ、ログ追加) ---
   const validateItems = useCallback(async () => {
@@ -299,19 +313,99 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
     }
   };
 
-  // Function to handle column sorting
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      // Toggle direction if clicking the same column
-      setSortDirection(currentDirection => 
-        currentDirection === 'asc' ? 'desc' : 'asc'
-      );
-    } else {
-      // Set new column and default to ascending order
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
+  // ソート処理を物品一覧と同様に改善
+  const handleSort = (column: string | 'item_info' | 'details') => {
+    setSortConfig(prevConfig => {
+      const isCurrentColumn = prevConfig.key === column;
+      const currentDirection = prevConfig.direction;
+
+      if (isWideScreen) {
+        // ワイドスクリーン時は通常の動作
+        if (column === 'item_info' || column === 'details') {
+          return prevConfig;
+        }
+        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+        return { key: column, direction: direction };
+      } else {
+        // 画面幅が狭い場合は特別な処理
+        if (column === 'item_info') {
+          // 物品情報の場合：物品ID→物品ID(降順)→物品名→物品名(降順)→物品IDの順に切り替え
+          if (prevConfig.key === 'item_id' && currentDirection === 'asc') {
+            return { key: 'item_id', direction: 'desc' };
+          } else if (prevConfig.key === 'item_id' && currentDirection === 'desc') {
+            return { key: 'name', direction: 'asc' };
+          } else if (prevConfig.key === 'name' && currentDirection === 'asc') {
+            return { key: 'name', direction: 'desc' };
+          } else {
+            return { key: 'item_id', direction: 'asc' };
+          }
+        } else if (column === 'details') {
+          // 詳細情報の場合：ジャンル→ジャンル(降順)→管理者→管理者(降順)→ジャンルの順に切り替え
+          if (prevConfig.key === 'genre' && currentDirection === 'asc') {
+            return { key: 'genre', direction: 'desc' };
+          } else if (prevConfig.key === 'genre' && currentDirection === 'desc') {
+            return { key: 'manager', direction: 'asc' };
+          } else if (prevConfig.key === 'manager' && currentDirection === 'asc') {
+            return { key: 'manager', direction: 'desc' };
+          } else {
+            return { key: 'genre', direction: 'asc' };
+          }
+        } else {
+          // 通常のカラムはasc/descを切り替え
+          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: column, direction: direction };
+        }
+      }
+    });
   };
+
+  // ソートインジケータを取得する関数を追加
+  const getSortIndicator = (targetKey: string | 'item_info' | 'details') => {
+    let isActive = false;
+    let direction = sortConfig.direction;
+    let displayKey: string = '';
+
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+      displayKey = '';
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'name' ? '物品名' : '';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+        displayKey = sortConfig.key === 'genre' ? 'ジャンル' : sortConfig.key === 'manager' ? '管理者' : '';
+      } else {
+        isActive = sortConfig.key === targetKey;
+        displayKey = '';
+      }
+    }
+
+    if (!isActive) return null;
+
+    const arrow = direction === 'asc' ? '↑' : '↓';
+    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
+  };
+
+  // ソート中のカラムに背景色を付ける関数を追加
+  const getSortBgColor = (targetKey: string | 'item_info' | 'details') => {
+    let isActive = false;
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+      } else {
+        isActive = sortConfig.key === targetKey;
+      }
+    }
+
+    if (!isActive) return '';
+    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
+  };
+
   // --- レンダリング ---
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -356,85 +450,49 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 {/* 物品ID - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('item_id')}
-                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    sortColumn === 'item_id'
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
                 >
-                  物品ID {sortColumn === 'item_id' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
+                  物品ID {getSortIndicator('item_id')}
                 </th>
                 
                 {/* 物品名 - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('name')}
-                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    sortColumn === 'name'
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('name')}`}
                 >
-                  物品名 {sortColumn === 'name' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
+                  物品名 {getSortIndicator('name')}
                 </th>
                 
                 {/* 物品情報 - 小さい画面用 */}
                 <th
-                  onClick={() => isWideScreen ? null : handleSort(sortColumn === 'item_id' ? 'name' : 'item_id')}
-                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    (sortColumn === 'item_id' || sortColumn === 'name')
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  onClick={() => !isWideScreen && handleSort('item_info')}
+                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
                 >
-                  物品情報 
-                  {(sortColumn === 'item_id' || sortColumn === 'name') && 
-                    <span className="ml-1 font-bold">
-                      {sortColumn === 'item_id' ? '物品ID' : '物品名'}
-                      {sortDirection === 'asc' ? '↑' : '↓'}
-                    </span>
-                  }
+                  {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
                 </th>
                 
                 {/* ジャンル - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('genre')}
-                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    sortColumn === 'genre'
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('genre')}`}
                 >
-                  ジャンル {sortColumn === 'genre' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
+                  ジャンル {getSortIndicator('genre')}
                 </th>
                 
                 {/* 管理者 - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('manager')}
-                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    sortColumn === 'manager'
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('manager')}`}
                 >
-                  管理者 {sortColumn === 'manager' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
+                  管理者 {getSortIndicator('manager')}
                 </th>
                 
                 {/* 詳細情報 - 小さい画面用 */}
                 <th
-                  onClick={() => isWideScreen ? null : handleSort(sortColumn === 'genre' ? 'manager' : 'genre')}
-                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    (sortColumn === 'genre' || sortColumn === 'manager')
-                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
-                      : ''
-                  }`}
+                  onClick={() => !isWideScreen && handleSort('details')}
+                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('details')}`}
                 >
-                  詳細情報
-                  {(sortColumn === 'genre' || sortColumn === 'manager') && 
-                    <span className="ml-1 font-bold">
-                      {sortColumn === 'genre' ? 'ジャンル' : '管理者'}
-                      {sortDirection === 'asc' ? '↑' : '↓'}
-                    </span>
-                  }
+                  {!getSortIndicator('details') && '詳細情報'} {getSortIndicator('details')}
                 </th>
                 
                 {/* エラー内容カラム */}

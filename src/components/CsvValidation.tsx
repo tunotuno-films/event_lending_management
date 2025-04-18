@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, insertWithOwnerId, getCurrentUserId } from '../lib/supabase'; // insertWithOwnerId, getCurrentUserId をインポート
 import { AlertCircle, X, CheckCircle, Loader2 } from 'lucide-react'; // アイコン追加
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
+import { motion } from 'framer-motion'; // framer-motion をインポート
 
 // CsvItem インターフェース (変更なし)
 interface CsvItem {
@@ -44,6 +45,28 @@ interface CsvValidationProps {
   csvData: CsvItem[]; // 受け取るCSVデータの型を定義（パース済みの想定）
   // setCsvData はこのコンポーネントでは不要かもしれないので削除 (親で管理)
 }
+
+// アニメーションバリアントを追加
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05 // 子要素の表示を少しずつ遅らせる
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3 // アニメーション時間
+    }
+  }
+};
 
 const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
   const navigate = useNavigate();
@@ -357,9 +380,20 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            {/* tbody を motion.tbody に変更し、variants を適用 */}
+            <motion.tbody
+              className="bg-white divide-y divide-gray-200"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {sortedItems.map((item, index) => (
-                <tr key={index} className={item.isValid ? '' : 'bg-red-50'}>
+                // tr を motion.tr に変更し、variants を適用
+                <motion.tr 
+                  key={index} 
+                  className={item.isValid ? '' : 'bg-red-50'}
+                  variants={itemVariants}
+                >
                   <td className="px-4 py-3 whitespace-nowrap text-center">
                     {item.isValid ? (
                       <CheckCircle className="h-5 w-5 text-green-500 inline-block" />
@@ -382,9 +416,9 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                       <span className="text-green-600">OK</span>
                     )}
                   </td>
-                </tr>
+                </motion.tr>
               ))}
-            </tbody>
+            </motion.tbody>
           </table>
         </div>
       )}

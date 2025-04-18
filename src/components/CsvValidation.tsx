@@ -74,9 +74,21 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
   const [items, setItems] = useState<CsvItem[]>([]);
   const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [isProcessing, setIsProcessing] = useState(false); // 登録処理中フラグ
-  const [isValidating, setIsValidating] = useState(false); // ★ バリデーション中フラグを追加
+  const [isValidating, setIsValidating] = useState(false); // バリデーション中フラグ
   const [sortColumn, setSortColumn] = useState<string>('item_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  // 画面幅の状態を追加
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+
+  // リサイズ検知のためのイベントリスナー
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWideScreen(window.innerWidth >= 1800);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 並び替え済みの items を生成
   const sortedItems = useMemo(() => {
@@ -89,15 +101,6 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
       return 0;
     });
   }, [items, sortColumn, sortDirection]);
-
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
 
   // --- バリデーション関数 (useCallbackでラップ、ログ追加) ---
   const validateItems = useCallback(async () => {
@@ -296,6 +299,19 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
     }
   };
 
+  // Function to handle column sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(currentDirection => 
+        currentDirection === 'asc' ? 'desc' : 'asc'
+      );
+    } else {
+      // Set new column and default to ascending order
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
   // --- レンダリング ---
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -332,14 +348,15 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {/* 状態カラムの幅を w-16 に変更 */}
+                {/* 状態カラム */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                   状態
                 </th>
+                
+                {/* 物品ID - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('item_id')}
-                  // 幅指定を削除
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'item_id'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -347,10 +364,11 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 >
                   物品ID {sortColumn === 'item_id' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
                 </th>
+                
+                {/* 物品名 - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('name')}
-                  // 幅指定を削除
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'name'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -358,10 +376,29 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 >
                   物品名 {sortColumn === 'name' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
                 </th>
+                
+                {/* 物品情報 - 小さい画面用 */}
+                <th
+                  onClick={() => isWideScreen ? null : handleSort(sortColumn === 'item_id' ? 'name' : 'item_id')}
+                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                    (sortColumn === 'item_id' || sortColumn === 'name')
+                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
+                      : ''
+                  }`}
+                >
+                  物品情報 
+                  {(sortColumn === 'item_id' || sortColumn === 'name') && 
+                    <span className="ml-1 font-bold">
+                      {sortColumn === 'item_id' ? '物品ID' : '物品名'}
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  }
+                </th>
+                
+                {/* ジャンル - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('genre')}
-                  // 幅指定を削除
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'genre'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -369,10 +406,11 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 >
                   ジャンル {sortColumn === 'genre' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
                 </th>
+                
+                {/* 管理者 - 通常の画面で表示 */}
                 <th
                   onClick={() => handleSort('manager')}
-                  // 幅指定を削除
-                  className={`cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`hidden min-[1800px]:table-cell cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     sortColumn === 'manager'
                       ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
                       : ''
@@ -380,13 +418,33 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                 >
                   管理者 {sortColumn === 'manager' && (<span className="ml-1 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>)}
                 </th>
-                {/* エラー内容カラムの幅指定を削除 */}
+                
+                {/* 詳細情報 - 小さい画面用 */}
+                <th
+                  onClick={() => isWideScreen ? null : handleSort(sortColumn === 'genre' ? 'manager' : 'genre')}
+                  className={`min-[1800px]:hidden cursor-pointer px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                    (sortColumn === 'genre' || sortColumn === 'manager')
+                      ? sortDirection === 'asc' ? 'bg-green-100' : 'bg-orange-100'
+                      : ''
+                  }`}
+                >
+                  詳細情報
+                  {(sortColumn === 'genre' || sortColumn === 'manager') && 
+                    <span className="ml-1 font-bold">
+                      {sortColumn === 'genre' ? 'ジャンル' : '管理者'}
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  }
+                </th>
+                
+                {/* エラー内容カラム */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   エラー内容
                 </th>
               </tr>
             </thead>
-            {/* tbody を motion.tbody に変更し、variants を適用 */}
+            
+            {/* tbody を motion.tbody に変更 */}
             <motion.tbody
               className="bg-white divide-y divide-gray-200"
               variants={containerVariants}
@@ -394,7 +452,6 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
               animate="visible"
             >
               {sortedItems.map((item, index) => (
-                // tr を motion.tr に変更し、variants を適用
                 <motion.tr 
                   key={index} 
                   className={item.isValid ? '' : 'bg-red-50'}
@@ -408,21 +465,52 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
                       <AlertCircle className="h-5 w-5 text-red-500 inline-block" />
                     )}
                   </td>
-                  {/* 他のカラムのセル */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-700">{item.item_id || '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.name || '-'}</td>
-                  {/* ジャンルカラムの表示をバッジスタイルに変更 */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                  
+                  {/* 物品ID - 通常画面表示 */}
+                  <td className="hidden min-[1800px]:table-cell px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-700">
+                    {item.item_id || '-'}
+                  </td>
+                  
+                  {/* 物品名 - 通常画面表示 */}
+                  <td className="hidden min-[1800px]:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {item.name || '-'}
+                  </td>
+                  
+                  {/* 物品情報 - 小さい画面用 */}
+                  <td className="px-4 py-3 min-[1800px]:hidden">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-mono">{item.item_id || '-'}</span>
+                      <span className="text-xs text-gray-600 break-words">{item.name || '-'}</span>
+                    </div>
+                  </td>
+                  
+                  {/* ジャンル - 通常画面表示 */}
+                  <td className="hidden min-[1800px]:table-cell px-4 py-3 whitespace-nowrap text-sm">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {item.genre || '-'}
                     </span>
                   </td>
-                  {/* 管理者カラムの表示をバッジスタイルに変更 */}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                  
+                  {/* 管理者 - 通常画面表示 */}
+                  <td className="hidden min-[1800px]:table-cell px-4 py-3 whitespace-nowrap text-sm">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
                       {item.manager || '-'}
                     </span>
                   </td>
+                  
+                  {/* 詳細情報 - 小さい画面用 */}
+                  <td className="px-4 py-3 min-[1800px]:hidden">
+                    <div className="flex flex-col gap-1">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 w-fit">
+                        {item.genre || '-'}
+                      </span>
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 w-fit">
+                        {item.manager || '-'}
+                      </span>
+                    </div>
+                  </td>
+                  
+                  {/* エラー内容 */}
                   <td className="px-4 py-3 text-sm">
                     {item.errors.length > 0 ? (
                       <ul className="list-disc list-inside text-red-600 space-y-1">
@@ -441,7 +529,7 @@ const CsvValidation: React.FC<CsvValidationProps> = ({ csvData }) => {
         </div>
       )}
 
-      {/* 移動したボタンブロック：ボタンを左寄せに修正 */}
+      {/* ボタンブロック */}
       <div className="flex gap-2 justify-start mt-4">
         <button
           onClick={() => navigate('/')} // または前のページに戻るなど

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 // Package アイコンをインポート
-import { Pencil, Trash2, X, AlertCircle, Undo2, Package } from 'lucide-react'; 
+import { Pencil, Trash2, X, AlertCircle, Undo2, Download } from 'lucide-react'; 
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
-import DownloadButton from './DownloadButton'; // DownloadButton をインポート
 import { motion } from 'framer-motion'; // Import motion
+
+// デフォルト画像を定義
+const DEFAULT_IMAGE = 'https://placehold.jp/3b82f6/ffffff/150x150.png?text=No+Image';
 
 interface Item {
   item_id: string;
@@ -14,6 +16,22 @@ interface Item {
   manager: string;
   registered_date: string;
 }
+
+// 画像URLのヘルパー関数を追加
+const getItemImageUrl = (imageUrl: string | null): string => {
+  if (!imageUrl) return DEFAULT_IMAGE;
+  
+  // 空文字やundefinedの場合
+  if (imageUrl.trim() === '') return DEFAULT_IMAGE;
+  
+  // 有効なURLでない場合
+  try {
+    new URL(imageUrl);
+    return imageUrl;
+  } catch (e) {
+    return DEFAULT_IMAGE;
+  }
+};
 
 interface NotificationProps {
   message: string;
@@ -198,19 +216,12 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                {item.image && item.image.trim() !== '' ? (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                    <Package className="h-10 w-10 text-gray-400" />
-                  </div>
-                )}
-              </div>
+              <img
+                src={getItemImageUrl(item.image)}
+                alt={item.name}
+                className="h-20 w-20 object-cover rounded-lg"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+              />
               <input
                 type="file"
                 accept="image/*"
@@ -341,34 +352,103 @@ export default function ItemList() {
     message: '',
     type: 'success'
   });
-  const [sortColumn, setSortColumn] = useState<string>('item_id');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Item | 'item_info' | 'details'; direction: 'asc' | 'desc' } | null>({ key: 'item_id', direction: 'asc' });
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1800);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWideScreen(window.innerWidth >= 1800);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const sortedItems = useMemo(() => {
-    if (!sortColumn) return items;
-    return items.slice().sort((a, b) => {
-      let aVal = a[sortColumn as keyof Item];
-      let bVal = b[sortColumn as keyof Item];
-      if (sortColumn === 'registered_date') {
+    if (!sortConfig) return items;
+
+    let sortKey: keyof Item;
+    if (sortConfig.key === 'item_info') {
+      sortKey = 'item_id';
+    } else if (sortConfig.key === 'details') {
+      sortKey = 'genre';
+    } else {
+      sortKey = sortConfig.key as keyof Item;
+    }
+
+    return [...items].sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (sortKey === 'registered_date') {
         const aDate = new Date(aVal as string);
         const bDate = new Date(bVal as string);
-        if (aDate < bDate) return sortDirection === 'asc' ? -1 : 1;
-        if (aDate > bDate) return sortDirection === 'asc' ? 1 : -1;
+        if (aDate < bDate) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aDate > bDate) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       }
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+
+      if (sortKey === 'item_id') {
+        const numA = parseInt(aVal as string, 10);
+        const numB = parseInt(bVal as string, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+        }
+      }
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
       return 0;
     });
-  }, [items, sortColumn, sortDirection]);
+  }, [items, sortConfig]);
 
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
+  const handleSort = (column: keyof Item | 'item_info' | 'details') => {
+    setSortConfig(prevConfig => {
+      const isCurrentColumn = prevConfig?.key === column;
+      const currentDirection = prevConfig?.direction;
+
+      if (isWideScreen) {
+        if (column === 'item_info' || column === 'details') {
+          return prevConfig;
+        }
+        const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+        return { key: column, direction: direction };
+      } else {
+        if (column === 'item_info') {
+          if (prevConfig?.key === 'item_id' && currentDirection === 'asc') {
+            return { key: 'item_id', direction: 'desc' };
+          } else if (prevConfig?.key === 'item_id' && currentDirection === 'desc') {
+            return { key: 'name', direction: 'asc' };
+          } else if (prevConfig?.key === 'name' && currentDirection === 'asc') {
+            return { key: 'name', direction: 'desc' };
+          } else {
+            return { key: 'item_id', direction: 'asc' };
+          }
+        } else if (column === 'details') {
+          if (prevConfig?.key === 'genre' && currentDirection === 'asc') {
+            return { key: 'genre', direction: 'desc' };
+          } else if (prevConfig?.key === 'genre' && currentDirection === 'desc') {
+            return { key: 'manager', direction: 'asc' };
+          } else if (prevConfig?.key === 'manager' && currentDirection === 'asc') {
+            return { key: 'manager', direction: 'desc' };
+          } else {
+            return { key: 'genre', direction: 'asc' };
+          }
+        } else {
+          const direction = isCurrentColumn && currentDirection === 'asc' ? 'desc' : 'asc';
+          return { key: column, direction: direction };
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -399,6 +479,32 @@ export default function ItemList() {
       setLoading(false);
     }
   };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim() === '') {
+      fetchItems();
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('*')
+          .or(`item_id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
+          .eq('item_deleted', false)
+          .order('registered_date', { ascending: false });
+        if (error) throw error;
+        setItems(data || []);
+      } catch (error) {
+        console.error('Error searching items:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      handleSearch();
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const handleUpdateItem = async (updatedItem: Item) => {
     try {
@@ -504,31 +610,84 @@ export default function ItemList() {
     return value;
   };
 
-  const generateCSVDataForButton = async (): Promise<{ data: Blob, filename: string } | null> => {
-    try {
-      let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
-      sortedItems.forEach(item => {
-        csv += `${item.item_id},${escapeCSV(item.name)},${escapeCSV(item.genre)},${escapeCSV(item.manager)},${formatDate(item.registered_date)}\n`;
-      });
-      const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-
-      const today = new Date();
-      const yyyy = today.getFullYear().toString();
-      const mm = (today.getMonth() + 1).toString().padStart(2, '0');
-      const dd = today.getDate().toString().padStart(2, '0');
-      const filename = `${yyyy}${mm}${dd}_物品一覧.csv`;
-
-      return { data: blob, filename };
-    } catch (error) {
-      console.error("Error generating CSV data:", error);
-      setNotification({
-        show: true,
-        message: 'CSVデータの生成に失敗しました',
-        type: 'error'
-      });
-      return null;
-    }
+  const handleCSVExport = () => {
+    let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
+    items.forEach(item => {
+      csv += `${item.item_id},${escapeCSV(item.name)},${escapeCSV(item.genre)},${escapeCSV(item.manager)},${formatDate(item.registered_date)}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    const today = new Date();
+    const yyyy = today.getFullYear().toString();
+    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+    const dd = today.getDate().toString().padStart(2, '0');
+    a.download = `${yyyy}${mm}${dd}_物品一覧.csv`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
+
+  const getSortIndicator = (targetKey: keyof Item | 'item_info' | 'details') => {
+    if (!sortConfig) return null;
+
+    let isActive = false;
+    let direction = sortConfig.direction;
+    let displayKey: string = '';
+
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+      displayKey = '';
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+        displayKey = sortConfig.key === 'item_id' ? '物品ID' : sortConfig.key === 'name' ? '物品名' : '';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+        displayKey = sortConfig.key === 'genre' ? 'ジャンル' : sortConfig.key === 'manager' ? '管理者' : '';
+      } else {
+        isActive = sortConfig.key === targetKey;
+        displayKey = '';
+      }
+    }
+
+    if (!isActive) return null;
+
+    const arrow = direction === 'asc' ? '↑' : '↓';
+    return <span className="ml-1 font-bold">{displayKey && !isWideScreen ? `${displayKey}${arrow}` : arrow}</span>;
+  };
+
+  const getSortBgColor = (targetKey: keyof Item | 'item_info' | 'details') => {
+    if (!sortConfig) return '';
+
+    let isActive = false;
+    if (isWideScreen) {
+      isActive = sortConfig.key === targetKey;
+    } else {
+      if (targetKey === 'item_info') {
+        isActive = sortConfig.key === 'item_id' || sortConfig.key === 'name';
+      } else if (targetKey === 'details') {
+        isActive = sortConfig.key === 'genre' || sortConfig.key === 'manager';
+      } else {
+        isActive = sortConfig.key === targetKey;
+      }
+    }
+
+    if (!isActive) return '';
+    return sortConfig.direction === 'asc' ? 'bg-green-100' : 'bg-orange-100';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingIndicator />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -545,144 +704,162 @@ export default function ItemList() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">登録物品一覧</h2>
         <div className="flex gap-2">
-            <DownloadButton 
-              onGenerateData={generateCSVDataForButton}
-              idleText="CSVダウンロード"
-            />
+            <button
+            onClick={handleCSVExport}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            >
+            <Download size={16} />
+            CSVダウンロード
+            </button>
         </div>
       </div>
   
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="物品IDまたは物品名で検索"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2"
+        />
+      </div>
+  
       <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
-        {loading ? (
-          <div className="flex justify-center items-center min-h-[200px]">
-            <LoadingIndicator />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            登録されている物品はありません。
-          </div>
-        ) : (
-          <table className="w-full min-w-[800px] divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr className="align-middle">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  画像
-                </th>
-                <th
-                  onClick={() => handleSort('item_id')}
-                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='item_id' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-                >
-                  物品ID {sortColumn==='item_id' && (
-                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th
-                  onClick={() => handleSort('name')}
-                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='name' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-                >
-                  物品名 {sortColumn==='name' && (
-                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th
-                  onClick={() => handleSort('genre')}
-                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='genre' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-                >
-                  ジャンル {sortColumn==='genre' && (
-                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th
-                  onClick={() => handleSort('manager')}
-                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='manager' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-                >
-                  管理者 {sortColumn==='manager' && (
-                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th
-                  onClick={() => handleSort('registered_date')}
-                  className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn==='registered_date' ? (sortDirection==='asc' ? 'bg-green-100' : 'bg-orange-100') : ''}`}
-                >
-                  登録日 {sortColumn==='registered_date' && (
-                    <span className="ml-1 font-bold">{sortDirection==='asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  編集
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  削除
-                </th>
-              </tr>
-            </thead>
-            <motion.tbody
+        <table className="w-full min-w-[800px] divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr className="align-middle">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                画像
+              </th>
+              <th
+                onClick={() => !isWideScreen && handleSort('item_info')}
+                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_info')}`}
+              >
+                {!getSortIndicator('item_info') && '物品情報'} {getSortIndicator('item_info')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('item_id')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('item_id')}`}
+              >
+                物品ID {getSortIndicator('item_id')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('name')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider max-w-xs ${getSortBgColor('name')}`}
+              >
+                物品名 {getSortIndicator('name')}
+              </th>
+              <th
+                onClick={() => !isWideScreen && handleSort('details')}
+                className={`min-[1800px]:hidden cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('details')}`}
+              >
+                {!getSortIndicator('details') && '詳細情報'} {getSortIndicator('details')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('genre')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('genre')}`}
+              >
+                ジャンル {getSortIndicator('genre')}
+              </th>
+              <th
+                onClick={() => isWideScreen && handleSort('manager')}
+                className={`hidden min-[1800px]:table-cell cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('manager')}`}
+              >
+                管理者 {getSortIndicator('manager')}
+              </th>
+              <th
+                onClick={() => handleSort('registered_date')}
+                className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${getSortBgColor('registered_date')}`}
+              >
+                登録日 {getSortIndicator('registered_date')}
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                編集
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                削除
+              </th>
+            </tr>
+          </thead>
+          <motion.tbody
               className="bg-white divide-y divide-gray-200"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
             >
-              {sortedItems.map((item) => (
-                <motion.tr
-                  key={item.item_id}
-                  className="hover:bg-gray-50 align-middle"
-                  variants={itemVariants}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
-                      {item.image && item.image.trim() !== '' ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="max-h-full max-w-full object-contain"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                          <Package className="h-6 w-6 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-mono text-gray-900">{item.item_id}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{item.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+            {sortedItems.map((item) => (
+              <motion.tr 
+                key={item.item_id} 
+                className="hover:bg-gray-50 align-middle"
+                variants={itemVariants}
+              >
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                    <img
+                      src={getItemImageUrl(item.image)}
+                      alt={item.name}
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
+                    />
+                  </div>
+                </td>
+                <td className="px-6 py-4 min-[1800px]:hidden">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-mono">{item.item_id}</span>
+                    <span className="text-xs text-gray-600 break-words">{item.name}</span>
+                  </div>
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-mono">
+                    {item.item_id}
+                  </div>
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 max-w-xs">
+                  <div className="text-sm text-gray-900 truncate" title={item.name}>{item.name}</div>
+                </td>
+                <td className="px-6 py-4 min-[1800px]:hidden">
+                  <div className="flex flex-col gap-1">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 w-fit">
                       {item.genre}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 w-fit">
                       {item.manager}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(item.registered_date)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    <button
-                      onClick={() => setEditingItem(item)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    <button
-                      onClick={() => setDeletingItem(item)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-            </motion.tbody>
-          </table>
-        )}
+                  </div>
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                    {item.genre}
+                  </span>
+                </td>
+                <td className="hidden min-[1800px]:table-cell px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                    {item.manager}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {formatDate(item.registered_date)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setEditingItem(item)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  <button
+                    onClick={() => setDeletingItem(item)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </td>
+              </motion.tr>
+            ))}
+          </motion.tbody>
+        </table>
       </div>
   
       {editingItem && (

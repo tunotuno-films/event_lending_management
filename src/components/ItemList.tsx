@@ -226,13 +226,20 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
               画像
             </label>
             <div className="flex items-center gap-4">
-              {/* 画像プレビューを改善 */}
-              <img
-                src={formData.imagePreview || getItemImageUrl(item.image)}
-                alt={item.name}
-                className="h-20 w-20 object-cover rounded-lg"
-                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
-              />
+              {/* 画像表示を条件分岐に変更 */}
+              <div className="h-20 w-20 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
+                {formData.imagePreview && formData.imagePreview.trim() !== '' ? (
+                  <img
+                    src={getItemImageUrl(formData.imagePreview)}
+                    alt={item.name}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                    <Package className="h-10 w-10 text-gray-400" />
+                  </div>
+                )}
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -809,10 +816,9 @@ export default function ItemList() {
                   <div className="h-12 w-12 rounded-lg overflow-hidden flex items-center justify-center border bg-white">
                     {item.image && item.image.trim() !== '' ? (
                       <img
-                        src={item.image}
+                        src={getItemImageUrl(item.image)}
                         alt={item.name}
                         className="max-h-full max-w-full object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE }}
                       />
                     ) : (
                       <div className="h-full w-full bg-gray-50 flex items-center justify-center">

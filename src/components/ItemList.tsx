@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 // Package アイコンをインポート
-import { Pencil, Trash2, X, AlertCircle, Undo2, Download } from 'lucide-react'; 
+import { Pencil, Trash2, X, AlertCircle, Undo2 } from 'lucide-react'; // Download を削除して Package を追加
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
+import DownloadButton from './DownloadButton'; // DownloadButton を再追加
 import { motion } from 'framer-motion'; // Import motion
 
 // デフォルト画像を定義
@@ -610,26 +611,30 @@ export default function ItemList() {
     return value;
   };
 
-  const handleCSVExport = () => {
-    let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
-    items.forEach(item => {
-      csv += `${item.item_id},${escapeCSV(item.name)},${escapeCSV(item.genre)},${escapeCSV(item.manager)},${formatDate(item.registered_date)}\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    
-    const today = new Date();
-    const yyyy = today.getFullYear().toString();
-    const mm = (today.getMonth() + 1).toString().padStart(2, '0');
-    const dd = today.getDate().toString().padStart(2, '0');
-    a.download = `${yyyy}${mm}${dd}_物品一覧.csv`;
-    
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const generateCSVDataForButton = async (): Promise<{ data: Blob, filename: string } | null> => {
+    try {
+      let csv = "物品ID,物品名,ジャンル,管理者,登録日\n";
+      sortedItems.forEach(item => {
+        csv += `${item.item_id},${escapeCSV(item.name)},${escapeCSV(item.genre)},${escapeCSV(item.manager)},${formatDate(item.registered_date)}\n`;
+      });
+      const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
+
+      const today = new Date();
+      const yyyy = today.getFullYear().toString();
+      const mm = (today.getMonth() + 1).toString().padStart(2, '0');
+      const dd = today.getDate().toString().padStart(2, '0');
+      const filename = `${yyyy}${mm}${dd}_物品一覧.csv`;
+
+      return { data: blob, filename };
+    } catch (error) {
+      console.error("Error generating CSV data:", error);
+      setNotification({
+        show: true,
+        message: 'CSVデータの生成に失敗しました',
+        type: 'error'
+      });
+      return null;
+    }
   };
 
   const getSortIndicator = (targetKey: keyof Item | 'item_info' | 'details') => {
@@ -704,13 +709,11 @@ export default function ItemList() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">登録物品一覧</h2>
         <div className="flex gap-2">
-            <button
-            onClick={handleCSVExport}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-            >
-            <Download size={16} />
-            CSVダウンロード
-            </button>
+            {/* ダウンロードボタンを元の実装に戻す */}
+            <DownloadButton 
+              onGenerateData={generateCSVDataForButton}
+              idleText="CSVダウンロード"
+            />
         </div>
       </div>
   

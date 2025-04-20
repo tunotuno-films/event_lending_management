@@ -193,6 +193,58 @@ export default function EventDaily() {
     }
   }, [selectedEventId]);
 
+  const fetchItemsFromPreviousEvent = useCallback(async (previousEventId: string) => {
+    if (!previousEventId) return;
+    
+    try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        console.error('ユーザー情報が取得できません (fetchItemsFromPreviousEvent)');
+        return;
+      }
+
+      // 選択したイベントのIDを取得
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('id')
+        .eq('event_id', previousEventId)
+        .eq('created_by', userId)
+        .maybeSingle();
+
+      if (eventError || !eventData) {
+        console.error('選択されたイベントが見つかりません。', eventError);
+        return;
+      }
+      
+      const previousEventRefId = eventData.id;
+
+      // そのイベントに登録されているアイテムのIDを取得
+      const { data: registeredItems, error: controlError } = await supabase
+        .from('control')
+        .select('item_id')
+        .eq('event_id_ref', previousEventRefId);
+
+      if (controlError) {
+        console.error('前回のイベントからアイテム情報の取得に失敗しました', controlError);
+        return;
+      }
+
+      // 取得したアイテムIDを選択状態にする
+      if (registeredItems && registeredItems.length > 0) {
+        const previousItemIds = registeredItems.map(item => item.item_id).filter(Boolean);
+        
+        // 現在表示されているアイテムリストと照合して選択状態にする
+        const itemsToSelect = items.filter(item => 
+          previousItemIds.includes(item.item_id)
+        ).map(item => item.item_id);
+        
+        setSelectedItemIds(itemsToSelect);
+      }
+    } catch (error) {
+      console.error('Error fetching items from previous event:', error);
+    }
+  }, [items]);
+
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
@@ -230,6 +282,13 @@ export default function EventDaily() {
     }
     window.dispatchEvent(new CustomEvent('selectedEventChanged'));
   }, [fetchAvailableItems]);
+
+  const handlePreviousEventChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const previousEventId = e.target.value;
+    if (previousEventId && previousEventId !== '') {
+      fetchItemsFromPreviousEvent(previousEventId);
+    }
+  }, [fetchItemsFromPreviousEvent]);
 
   const handleItemSelection = (itemId: string) => {
     setSelectedItemIds(prev => {
@@ -385,6 +444,26 @@ export default function EventDaily() {
           <option value="">{loadingEvents ? '読み込み中...' : 'イベントを選択してください'}</option>
           {events.map(event => (
             <option key={event.id} value={event.event_id}>
+              {event.event_id} - {event.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-6">
+        <label htmlFor="event-select-duplicate" className="block text-sm font-medium text-gray-700 mb-2">
+          前回のイベントからコピー
+        </label>
+        <select
+          id="event-select-duplicate"
+          defaultValue=""
+          onChange={handlePreviousEventChange}
+          className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+          disabled={loadingEvents}
+        >
+          <option value="">{loadingEvents ? '読み込み中...' : '前回のイベントを選択してください'}</option>
+          {events.map(event => (
+            <option key={`dup-${event.id}`} value={event.event_id}>
               {event.event_id} - {event.name}
             </option>
           ))}

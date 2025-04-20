@@ -70,6 +70,7 @@ export default function EventDaily() {
   const [events, setEvents] = useState<Event[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedPreviousEventId, setSelectedPreviousEventId] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -276,6 +277,8 @@ export default function EventDaily() {
 
   const handleEventChange = useCallback((selectedOldEventId: string) => {
     setSelectedEventId(selectedOldEventId);
+    // 前回のイベント選択状態をリセット
+    setSelectedPreviousEventId('');
     localStorage.setItem('selectedEventId', selectedOldEventId);
     if (selectedOldEventId) {
       fetchAvailableItems();
@@ -285,6 +288,7 @@ export default function EventDaily() {
 
   const handlePreviousEventChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const previousEventId = e.target.value;
+    setSelectedPreviousEventId(previousEventId);
     if (previousEventId && previousEventId !== '') {
       fetchItemsFromPreviousEvent(previousEventId);
     }
@@ -456,17 +460,19 @@ export default function EventDaily() {
         </label>
         <select
           id="event-select-duplicate"
-          defaultValue=""
+          value={selectedPreviousEventId}
           onChange={handlePreviousEventChange}
           className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
           disabled={loadingEvents}
         >
           <option value="">{loadingEvents ? '読み込み中...' : '前回のイベントを選択してください'}</option>
-          {events.map(event => (
-            <option key={`dup-${event.id}`} value={event.event_id}>
-              {event.event_id} - {event.name}
-            </option>
-          ))}
+          {events
+            .filter(event => event.event_id !== selectedEventId)
+            .map(event => (
+              <option key={`dup-${event.id}`} value={event.event_id}>
+                {event.event_id} - {event.name}
+              </option>
+            ))}
         </select>
       </div>
 

@@ -141,6 +141,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     imagePreview: item.image || '' // 画像プレビュー用の状態を追加
   });
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]); // State for name suggestions
+  const [suggestionNotification, setSuggestionNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,6 +209,8 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
   const handleSuggestionClick = (suggestion: string) => {
     setFormData(prev => ({ ...prev, name: suggestion }));
     setNameSuggestions([]); // Clear suggestions after selection
+    setSuggestionNotification({ show: true, message: '物品名を入力しました', type: 'success' });
+    setTimeout(() => setSuggestionNotification(null), 3000); // Hide after 3 seconds
   };
 
   // 画像選択時のハンドラーを改善してプレビュー機能を追加
@@ -227,6 +230,13 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {suggestionNotification?.show && (
+        <Notification
+          message={suggestionNotification.message}
+          type={suggestionNotification.type}
+          onClose={() => setSuggestionNotification(null)}
+        />
+      )}
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">物品編集</h2>
@@ -289,21 +299,25 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             />
             {/* Suggestions List */}
             {nameSuggestions.length > 0 && (
-              <div className="mt-2 border rounded-md max-h-40 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
+              <div className="mt-2 border rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                <h4 className="text-xs font-semibold mb-1 text-gray-600">
+                  既存の物品名候補:
+                </h4>
+                <div className="space-y-1">
                   {nameSuggestions.map((suggestion, index) => (
-                    <li key={index} className="flex items-center justify-between p-2 hover:bg-gray-50">
-                      <span className="text-sm text-gray-700 truncate mr-2">{suggestion}</span>
+                    <div key={index} className="flex items-center justify-between bg-white p-1 rounded text-sm">
+                      <span className="truncate mr-2">{suggestion}</span>
                       <button
                         type="button"
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded whitespace-nowrap"
+                        className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
+                        title="コピー"
                       >
                         コピー
                       </button>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </div>

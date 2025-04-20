@@ -216,9 +216,9 @@ const EditModal: React.FC<EditModalProps> = ({ event, onClose, onSave }) => {
                         type="button"
                         onClick={() => handleSelectSuggestion(match.name)}
                         className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
-                        title="選択"
+                        title="コピー"
                       >
-                        選択
+                        コピー
                       </button>
                     </div>
                   ))}

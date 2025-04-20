@@ -127,9 +127,10 @@ interface EditModalProps {
   onSave: (updatedItem: Item) => Promise<void>;
   genres: string[];
   managers: string[];
+  allItems: Item[]; // Add allItems prop
 }
 
-const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, managers }) => {
+const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, managers, allItems }) => {
   const [formData, setFormData] = useState({
     name: item.name,
     genre: item.genre,
@@ -139,6 +140,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
     image: null as File | null,
     imagePreview: item.image || '' // 画像プレビュー用の状態を追加
   });
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]); // State for name suggestions
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +183,31 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
       console.error('Error updating item:', error);
       alert('更新中にエラーが発生しました');
     }
+  };
+
+  // Handle name input change and update suggestions
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setFormData(prev => ({ ...prev, name: newName }));
+
+    if (newName.trim() === '') {
+      setNameSuggestions([]);
+      return;
+    }
+
+    const suggestions = allItems
+      .filter(i => i.item_id !== item.item_id && i.name.toLowerCase().includes(newName.toLowerCase()))
+      .map(i => i.name)
+      .filter((value, index, self) => self.indexOf(value) === index) // Get unique names
+      .slice(0, 5); // Limit suggestions
+
+    setNameSuggestions(suggestions);
+  };
+
+  // Handle suggestion copy
+  const handleSuggestionClick = (suggestion: string) => {
+    setFormData(prev => ({ ...prev, name: suggestion }));
+    setNameSuggestions([]); // Clear suggestions after selection
   };
 
   // 画像選択時のハンドラーを改善してプレビュー機能を追加
@@ -256,10 +283,29 @@ const EditModal: React.FC<EditModalProps> = ({ item, onClose, onSave, genres, ma
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={handleNameChange} // Use the new handler
               className="w-full border border-gray-300 rounded-md p-2"
               required
             />
+            {/* Suggestions List */}
+            {nameSuggestions.length > 0 && (
+              <div className="mt-2 border rounded-md max-h-40 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {nameSuggestions.map((suggestion, index) => (
+                    <li key={index} className="flex items-center justify-between p-2 hover:bg-gray-50">
+                      <span className="text-sm text-gray-700 truncate mr-2">{suggestion}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded whitespace-nowrap"
+                      >
+                        コピー
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div>
@@ -893,6 +939,7 @@ export default function ItemList() {
           onSave={handleUpdateItem}
           genres={genres}
           managers={managers}
+          allItems={items} // Pass all items to the modal
         />
       )}
 

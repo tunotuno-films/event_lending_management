@@ -287,7 +287,6 @@ export default function EventRegist() {
               <div className="space-y-1">
                 {matchingEventsById.map((event) => (
                   <div key={event.event_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
-                    {/* 表示形式を "eventId - eventName" に変更 */}
                     <span className="truncate mr-2 font-mono">{event.event_id} - {event.name}</span>
                   </div>
                 ))}
@@ -317,15 +316,14 @@ export default function EventRegist() {
               <div className="space-y-1">
                 {matchingEventsByName.map((event) => (
                   <div key={event.event_id} className="flex items-center justify-between bg-white p-1 rounded text-sm">
-                    {/* 表示形式を "eventName" のみに変更 */}
                     <span className="truncate mr-2">{event.name}</span>
                     <button
                       type="button"
                       onClick={() => handleSelectEventName(event.name)}
                       className="text-blue-500 hover:text-blue-700 p-1 rounded flex-shrink-0 text-xs font-semibold"
-                      title="選択"
+                      title="コピー"
                     >
-                      選択
+                      コピー
                     </button>
                   </div>
                 ))}

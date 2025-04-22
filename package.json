@@ -56,7 +56,8 @@
       "halign",
       "autotable",
       "onclone",
-      "gsap"
+      "gsap",
+      "googleusercontent"
     ]
   }
 }

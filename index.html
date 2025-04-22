@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/img/bar-code.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Add Content Security Policy meta tag -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self'; 
+      script-src 'self'; 
+      style-src 'self' 'unsafe-inline'; 
+      img-src 'self' data: https://*.supabase.co; 
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+      font-src 'self';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+    ">
     <title>イベント用貸出管理システム</title>
     <meta name="description" content="見える化でイベントが変わる、貸出管理から始まる改革" />
   </head>

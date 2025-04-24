@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-// ★ ArrowRight, ArrowLeft をインポートし、ArrowUpRight, ArrowDownRight を削除
-import { AlertCircle, X, Barcode, StopCircle, Package, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react';
+// ★ Redo2 をインポートし、Undo2 を削除
+import { AlertCircle, X, Barcode, StopCircle, Package, ArrowRight, ArrowLeft, Redo2 } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
@@ -102,17 +102,23 @@ const ActionButton: React.FC<{
   const offset = circumference * (1 - progress);
 
   const isReturnAction = action === 'return';
-  const buttonColor = isReturnAction ? 'blue' : 'red'; // 返却時は青、貸出時は赤
-  const Icon = isReturnAction ? RotateCcw : X;
-  const hoverBg = isReturnAction ? 'hover:bg-blue-200' : 'hover:bg-red-200';
-  const strokeColor = isReturnAction ? '#3b82f6' : '#ef4444'; // blue-500 or red-500
-  const bgColor = isReturnAction ? '#dbeafe' : '#fee2e2'; // blue-100 or red-100
+  // ★ 返却時(再貸出)は緑、貸出時(キャンセル)は赤
+  const buttonColor = isReturnAction ? 'green' : 'red'; 
+  // ★ 返却時のアイコンを Redo2 に変更
+  const Icon = isReturnAction ? Redo2 : X; 
+  // ★ 返却時(再貸出)は緑ホバー、貸出時(キャンセル)は赤ホバー
+  const hoverBg = isReturnAction ? 'hover:bg-green-200' : 'hover:bg-red-200';
+  // ★ 返却時(再貸出)は緑ストローク、貸出時(キャンセル)は赤ストローク
+  const strokeColor = isReturnAction ? '#22c55e' : '#ef4444'; // green-500 or red-500
+  // ★ 返却時(再貸出)は緑背景円、貸出時(キャンセル)は赤背景円
+  const bgColor = isReturnAction ? '#dcfce7' : '#fee2e2'; // green-100 or red-100
   const ariaLabelText = isReturnAction ? '再貸出' : 'キャンセル';
   const handleClick = isReturnAction ? onReLoan : onCancel;
 
   return (
     <button
       onClick={handleClick}
+      // ★ 背景色、ホバー色を更新
       className={`relative w-16 h-16 rounded-full bg-${buttonColor}-100 ${hoverBg} flex items-center justify-center transition-colors group`}
       aria-label={`${ariaLabelText} (${Math.ceil(countdown)}秒)`}
     >
@@ -122,6 +128,7 @@ const ActionButton: React.FC<{
           cy="25"
           r={radius}
           fill="none"
+          // ★ 背景円色を更新
           stroke={bgColor}
           strokeWidth="4"
         />
@@ -130,6 +137,7 @@ const ActionButton: React.FC<{
           cy="25"
           r={radius}
           fill="none"
+          // ★ ストローク色を更新
           stroke={strokeColor}
           strokeWidth="4"
           strokeDasharray={circumference}
@@ -139,6 +147,7 @@ const ActionButton: React.FC<{
           style={{ transition: 'stroke-dashoffset 0.1s linear' }}
         />
       </svg>
+      {/* ★ アイコン色を更新 */}
       <Icon className={`w-8 h-8 text-${buttonColor}-500 z-10 group-hover:scale-110 transition-transform`} />
     </button>
   );
@@ -895,23 +904,42 @@ export default function LoaningControl() {
 
                 {autoProcessInfo ? (
                   <div className="text-center space-y-4">
-                    <div className="flex justify-center mb-4">
+                    {/* ★ アイコン表示部分にアニメーション背景を追加 */}
+                    <div className="relative flex justify-center mb-4 overflow-hidden rounded-md"> {/* overflow-hidden と rounded を追加 */}
+                      {/* アニメーション用背景 */}
+                      <div
+                        className={`absolute top-0 bottom-0 h-full ${
+                          // ★ 返却時のグラデーション背景を orange に変更
+                          autoProcessInfo.action === 'loan' 
+                            ? 'left-0 bg-gradient-to-r from-green-100 to-green-200' 
+                            : 'right-0 bg-gradient-to-l from-orange-100 to-orange-200' 
+                        }`}
+                        style={{
+                          width: `${Math.max(0, Math.min(100, (1 - cancelCountdown / 5) * 100))}%`, // 0-100% の範囲に制限
+                          transition: 'width 0.1s linear', // スムーズな変化
+                        }}
+                      />
+                      {/* アイコン (relative で手前に表示) */}
+                      <div className="relative z-10 py-2"> {/* 上下に少しパディングを追加 */}
                         {autoProcessInfo.action === 'loan' ? (
-                          <ArrowRight className="w-16 h-16 text-blue-500" />
+                          <ArrowRight className="w-16 h-16 text-green-500" /> // ★ 貸出アイコンの色を緑に変更
                         ) : (
-                          <ArrowLeft className="w-16 h-16 text-yellow-500" />
+                          // ★ 返却アイコンの色を orange に変更
+                          <ArrowLeft className="w-16 h-16 text-orange-500" /> // 返却アイコン (左矢印)
                         )}
+                      </div>
                     </div>
                     <p className="text-lg font-medium">
                       物品「<span className="font-bold">{autoProcessInfo.item.items?.name || autoProcessInfo.item.item_id}</span>」を
-                      <span className={`font-bold ${autoProcessInfo.action === 'loan' ? 'text-blue-600' : 'text-yellow-600'}`}>
+                      {/* ★ 返却テキストの色を orange に変更 */}
+                      <span className={`font-bold ${autoProcessInfo.action === 'loan' ? 'text-green-600' : 'text-orange-600'}`}> 
                         {autoProcessInfo.action === 'loan' ? '貸出' : '返却'}
                       </span>
                       します...
                     </p>
                     <p className="text-sm text-gray-500">
-                      {Math.ceil(cancelCountdown)}秒後に自動実行します。
-                      {autoProcessInfo.action === 'return' ? '再貸出する場合はボタンを押してください。' : 'キャンセルする場合はボタンを押してください。'}
+                        {Math.ceil(cancelCountdown)}秒後に自動実行します。<br />
+                        {autoProcessInfo.action === 'return' ? '再貸出する場合はボタンを押してください。' : 'キャンセルする場合はボタンを押してください。'}
                     </p>
                     <div className="flex justify-center mt-6">
                       <ActionButton

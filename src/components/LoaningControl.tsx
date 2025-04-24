@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-// ★ ArrowUpRight, ArrowDownRight をインポート
-import { AlertCircle, X, Barcode, StopCircle, Package, RotateCcw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+// ★ ArrowRight, ArrowLeft をインポートし、ArrowUpRight, ArrowDownRight を削除
+import { AlertCircle, X, Barcode, StopCircle, Package, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
@@ -193,6 +193,7 @@ export default function LoaningControl() {
       setBarcodeInput('');
       setShowCamera(true);
       setMatchingItems([]);
+      setMergeItemsInModal(false); // ★ モーダルを開くたびに OFF にリセット
     } else {
       setIsScanning(false);
     }
@@ -610,6 +611,8 @@ export default function LoaningControl() {
         })) as Control[];
         setMatchingItems(formattedData);
         setAutoProcessInfo(null);
+        setIsScanning(false);
+        setShowCamera(false);
         return;
       }
 
@@ -635,6 +638,13 @@ export default function LoaningControl() {
       setNotification({ show: true, message: 'バーコード処理中にエラーが発生しました', type: 'error' });
       setAutoProcessInfo(null);
       setMatchingItems([]);
+      if (mergeItemsInModal) {
+        setIsScanning(true);
+        setShowCamera(true);
+      } else {
+        setIsScanning(false);
+        setShowCamera(false);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -658,10 +668,15 @@ export default function LoaningControl() {
     }
 
     if (success) {
-      setShowBarcodeModal(false);
       setAutoProcessInfo(null);
       setCancelCountdown(5);
       setBarcodeInput('');
+      if (mergeItemsInModal) {
+        setIsScanning(true);
+        setShowCamera(true);
+      } else {
+        setShowBarcodeModal(false);
+      }
     }
   };
 
@@ -697,13 +712,57 @@ export default function LoaningControl() {
 
     if (returnSuccess && loanSuccess) {
        setNotification({ show: true, message: `アイテム「${item.items?.name || item.item_id}」を再貸出しました`, type: 'success' });
-       setShowBarcodeModal(false);
        setAutoProcessInfo(null);
        setCancelCountdown(5);
        setBarcodeInput('');
+       if (mergeItemsInModal) {
+         setIsScanning(true);
+         setShowCamera(true);
+       } else {
+         setShowBarcodeModal(false);
+       }
     } else if (returnSuccess && !loanSuccess) {
         setNotification({ show: true, message: '返却は成功しましたが、再貸出に失敗しました', type: 'error' });
         setAutoProcessInfo(null);
+    }
+  };
+
+  const handleManualBarcodeAction = async (item: Control, action: 'loan' | 'return') => {
+    if (isProcessing) return;
+
+    let success = false;
+    if (action === 'loan') {
+      success = await handleLoanItem(item);
+    } else {
+      success = await handleItemReturn(item);
+    }
+
+    if (success) {
+      setMatchingItems([]);
+      setBarcodeInput('');
+      if (mergeItemsInModal) {
+        setIsScanning(true);
+        setShowCamera(true);
+      } else {
+        setShowBarcodeModal(false);
+      }
+    }
+  };
+
+  const handleManualItemIdAction = async (item: Control, action: 'loan' | 'return') => {
+    if (isProcessing) return;
+
+    let success = false;
+    if (action === 'loan') {
+      success = await handleLoanItem(item);
+    } else {
+      success = await handleItemReturn(item);
+    }
+
+    if (success) {
+      setMatchingItems([]);
+      setBarcodeInput('');
+      setShowItemIdModal(false);
     }
   };
 
@@ -801,7 +860,6 @@ export default function LoaningControl() {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
                 <div className="flex justify-between items-center mb-4">
-                  {/* ★ ヘッダー部分にトグルスイッチを追加 */}
                   <div className="flex items-center gap-4">
                     <h3 className="text-lg font-semibold">バーコードで貸出/返却</h3>
                     <div className="flex items-center">
@@ -838,11 +896,10 @@ export default function LoaningControl() {
                 {autoProcessInfo ? (
                   <div className="text-center space-y-4">
                     <div className="flex justify-center mb-4">
-                       {/* ★ アイコンを ArrowUpRight と ArrowDownRight に変更 */}
                         {autoProcessInfo.action === 'loan' ? (
-                          <ArrowUpRight className="w-16 h-16 text-blue-500" /> // 貸出アイコン
+                          <ArrowRight className="w-16 h-16 text-blue-500" />
                         ) : (
-                          <ArrowDownRight className="w-16 h-16 text-yellow-500" /> // 返却アイコン
+                          <ArrowLeft className="w-16 h-16 text-yellow-500" />
                         )}
                     </div>
                     <p className="text-lg font-medium">
@@ -931,7 +988,7 @@ export default function LoaningControl() {
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
+                                    onClick={() => handleManualBarcodeAction(item, isLoaned ? 'return' : 'loan')}
                                     disabled={isProcessing}
                                     className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
                                       isLoaned ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
@@ -1034,7 +1091,7 @@ export default function LoaningControl() {
                               </div>
                             </div>
                             <button
-                              onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
+                              onClick={() => handleManualItemIdAction(item, isLoaned ? 'return' : 'loan')}
                               disabled={isProcessing}
                               className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
                                 isLoaned

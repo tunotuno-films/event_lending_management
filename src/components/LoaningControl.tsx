@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-import { AlertCircle, X, Barcode, StopCircle, Package } from 'lucide-react';
+import { AlertCircle, X, Barcode, StopCircle, Package, CheckCircle } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
@@ -88,6 +88,47 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
   );
 };
 
+// ★ キャンセルボタンコンポーネント
+const CancelButton: React.FC<{ countdown: number; onCancel: () => void }> = ({ countdown, onCancel }) => {
+  const radius = 20;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.max(0, Math.min(1, countdown / 5)); // 0 to 1
+  const offset = circumference * (1 - progress);
+
+  return (
+    <button
+      onClick={onCancel}
+      className="relative w-16 h-16 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors group"
+      aria-label={`キャンセル (${Math.ceil(countdown)}秒)`}
+    >
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 50 50">
+        <circle
+          cx="25"
+          cy="25"
+          r={radius}
+          fill="none"
+          stroke="#fee2e2" // bg-red-100
+          strokeWidth="4"
+        />
+        <circle
+          cx="25"
+          cy="25"
+          r={radius}
+          fill="none"
+          stroke="#ef4444" // text-red-500
+          strokeWidth="4"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 25 25)"
+          style={{ transition: 'stroke-dashoffset 0.1s linear' }} // アニメーションを滑らかに
+        />
+      </svg>
+      <X className="w-8 h-8 text-red-500 z-10 group-hover:scale-110 transition-transform" />
+    </button>
+  );
+};
+
 export default function LoaningControl() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -107,13 +148,17 @@ export default function LoaningControl() {
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
 
+  // ★ 自動処理用の state を追加
+  const [autoProcessInfo, setAutoProcessInfo] = useState<{ item: Control; action: 'loan' | 'return' } | null>(null);
+  const [autoProcessTimerId, setAutoProcessTimerId] = useState<NodeJS.Timeout | null>(null);
+  const [cancelCountdown, setCancelCountdown] = useState(5); // 5秒カウントダウン
+
   const { ref } = useZxing({
     onDecodeResult(result) {
       const scannedBarcode = result.getText();
-      setBarcodeInput(scannedBarcode);
       setShowCamera(false);
       setIsScanning(false);
-      handleBarcodeSubmit(scannedBarcode);
+      handleBarcodeSubmit(scannedBarcode); // ★ スキャン結果を直接渡す
     },
     paused: !isScanning
   });
@@ -163,6 +208,25 @@ export default function LoaningControl() {
       setMatchingItems([]);
     }
   }, [barcodeInput, waitingItems, loanedItems, selectedEventId]);
+
+  // ★ カウントダウン処理用の useEffect
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (autoProcessInfo && cancelCountdown > 0) {
+      intervalId = setInterval(() => {
+        setCancelCountdown(prev => Math.max(0, prev - 0.1)); // 0.1秒ごとに減らす
+      }, 100);
+    } else if (autoProcessInfo && cancelCountdown <= 0) {
+      // カウントダウン完了時に自動処理を実行 (タイマーがまだあれば)
+      if (autoProcessTimerId) {
+         confirmAutoProcess(); // タイマー完了を待たずに即時実行
+      }
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [autoProcessInfo, cancelCountdown, autoProcessTimerId]); // autoProcessTimerId も依存配列に追加
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -381,14 +445,6 @@ export default function LoaningControl() {
         type: 'success'
       });
 
-      // Clear modal state if the action originated from a modal
-      if (showBarcodeModal || showItemIdModal) {
-        setBarcodeInput('');
-        setMatchingItems([]);
-        setShowBarcodeModal(false);
-        setShowItemIdModal(false);
-      }
-      
     } catch (error) {
       console.error('貸出処理エラー:', error);
       setNotification({
@@ -396,6 +452,8 @@ export default function LoaningControl() {
         message: '貸出処理中にエラーが発生しました',
         type: 'error'
       });
+      // ★ エラー時は自動処理をキャンセル
+      cancelAutoProcess();
     } finally {
       setIsProcessing(false);
     }
@@ -483,14 +541,6 @@ export default function LoaningControl() {
         type: 'success'
       });
 
-      // Clear modal state if the action originated from a modal
-      if (showBarcodeModal || showItemIdModal) {
-        setBarcodeInput('');
-        setMatchingItems([]);
-        setShowBarcodeModal(false);
-        setShowItemIdModal(false);
-      }
-      
     } catch (error) {
       console.error('返却処理エラー:', error);
       setNotification({
@@ -498,34 +548,33 @@ export default function LoaningControl() {
         message: '返却処理中にエラーが発生しました',
         type: 'error'
       });
+       // ★ エラー時は自動処理をキャンセル
+      cancelAutoProcess();
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // ★ handleBarcodeSubmit を修正
   const handleBarcodeSubmit = async (barcode: string) => {
     if (!selectedEventId) {
-      setNotification({
-        show: true,
-        message: 'イベントを選択してください',
-        type: 'error'
-      });
+      setNotification({ show: true, message: 'イベントを選択してください', type: 'error' });
       return;
     }
+    if (isProcessing) return; // 処理中の重複実行防止
+
+    // 既存の自動処理タイマーがあればクリア
+    cancelAutoProcess(false); // 通知なしでキャンセル
+
+    setIsProcessing(true); // 検索処理中フラグ
+    setBarcodeInput(barcode); // スキャンされたバーコードを表示用に保持
 
     try {
       const { data, error } = await supabase
         .from('control')
         .select(`
-          control_id,
-          event_id,
-          item_id,
-          status,
-          control_datetime,
-          item_id_ref,
-          event_id_ref,
-          created_by,
-          items(item_id, name, image)
+          control_id, event_id, item_id, status, control_datetime,
+          item_id_ref, event_id_ref, created_by, items(item_id, name, image)
         `)
         .eq('event_id', selectedEventId)
         .eq('item_id', barcode);
@@ -533,30 +582,93 @@ export default function LoaningControl() {
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        setNotification({
-          show: true,
-          message: '該当する物品が見つかりません',
-        type: 'error'
-        });
+        setNotification({ show: true, message: `物品が見つかりません (ID: ${barcode})`, type: 'error' });
+        setMatchingItems([]); // 一致リストをクリア
+        setAutoProcessInfo(null); // 自動処理情報をクリア
         return;
       }
 
-      const formattedData = data.map(item => ({
-        ...item,
-        items: Array.isArray(item.items) ? item.items[0] : item.items,
-        events: null,
-        created_by: item.created_by || ''
-      })) as Control[];
+      if (data.length > 1) {
+        setNotification({ show: true, message: `複数の物品が見つかりました (ID: ${barcode})。手動で選択してください。`, type: 'error' });
+        // 複数ヒットした場合の処理（例：matchingItems にセットして手動選択させる）
+        const formattedData = data.map(item => ({
+          ...item,
+          items: Array.isArray(item.items) ? item.items[0] : item.items,
+          events: null,
+          created_by: item.created_by || ''
+        })) as Control[];
+        setMatchingItems(formattedData);
+        setAutoProcessInfo(null); // 自動処理情報をクリア
+        return;
+      }
 
-      setBarcodeInput(barcode);
-      setMatchingItems(formattedData);
+      // --- 該当アイテムが1つの場合：自動処理開始 ---
+      const itemToProcess = {
+        ...data[0],
+        items: Array.isArray(data[0].items) ? data[0].items[0] : data[0].items,
+        events: null,
+        created_by: data[0].created_by || ''
+      } as Control;
+
+      const action = itemToProcess.status ? 'return' : 'loan';
+      setAutoProcessInfo({ item: itemToProcess, action });
+      setCancelCountdown(5); // カウントダウンリセット
+      setMatchingItems([]); // 手動選択リストはクリア
+
+      // 5秒後に confirmAutoProcess を実行するタイマーを設定
+      const timerId = setTimeout(() => {
+        confirmAutoProcess();
+      }, 5000);
+      setAutoProcessTimerId(timerId);
+
     } catch (error) {
       console.error('Error processing barcode:', error);
-      setNotification({
-        show: true,
-        message: '処理中にエラーが発生しました',
-        type: 'error'
-      });
+      setNotification({ show: true, message: 'バーコード処理中にエラーが発生しました', type: 'error' });
+      setAutoProcessInfo(null);
+      setMatchingItems([]);
+    } finally {
+      setIsProcessing(false); // 検索処理完了
+    }
+  };
+
+  // ★ 自動処理実行関数
+  const confirmAutoProcess = () => {
+    if (!autoProcessInfo || isProcessing) return;
+
+    // タイマーをクリア（手動キャンセルや完了前に呼ばれた場合）
+    if (autoProcessTimerId) {
+      clearTimeout(autoProcessTimerId);
+      setAutoProcessTimerId(null);
+    }
+
+    const { item, action } = autoProcessInfo;
+
+    // 貸出/返却処理を実行
+    if (action === 'loan') {
+      handleLoanItem(item);
+    } else {
+      handleItemReturn(item);
+    }
+
+    // モーダルを閉じて state をリセット
+    setShowBarcodeModal(false);
+    setAutoProcessInfo(null);
+    setCancelCountdown(5);
+    setBarcodeInput(''); // バーコード入力もクリア
+  };
+
+  // ★ 自動処理キャンセル関数
+  const cancelAutoProcess = (showNotification = true) => {
+    if (autoProcessTimerId) {
+      clearTimeout(autoProcessTimerId);
+      setAutoProcessTimerId(null);
+    }
+    setAutoProcessInfo(null);
+    setCancelCountdown(5);
+    // バーコード入力はクリアしないでおく（再スキャンや手動入力のため）
+    // setBarcodeInput('');
+    if (showNotification) {
+      setNotification({ show: true, message: '処理をキャンセルしました', type: 'success' });
     }
   };
 
@@ -651,7 +763,7 @@ export default function LoaningControl() {
           </div>
 
           {showBarcodeModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"> {/* モーダル外クリック防止のため padding を追加 */}
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold">バーコードで貸出/返却</h3>
@@ -659,6 +771,7 @@ export default function LoaningControl() {
                     onClick={() => {
                       setShowBarcodeModal(false);
                       setIsScanning(false);
+                      cancelAutoProcess(false); // モーダルを閉じるときは自動処理もキャンセル
                     }}
                     className="text-gray-500 hover:text-gray-700"
                   >
@@ -666,96 +779,130 @@ export default function LoaningControl() {
                   </button>
                 </div>
 
-                <div className="mb-6">
-                  <button
-                    onClick={() => {
-                      setIsScanning(!isScanning);
-                      if (!isScanning) {
-                        setShowCamera(true);
-                      }
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md mb-4 ${
-                      isScanning 
-                        ? 'bg-red-500 hover:bg-red-600' 
-                        : 'bg-blue-500 hover:bg-blue-600'
-                    } text-white transition-colors`}
-                  >
-                    {isScanning ? (
-                      <>
-                        <StopCircle size={20} />
-                        Stop
-                      </>
-                    ) : (
-                      <>
-                        <Barcode size={20} />
-                        Start Scanning
-                      </>
-                    )}
-                  </button>
-
-                  {showCamera && (
-                    <div className="relative w-full max-w-lg mx-auto aspect-video mb-4 rounded-lg overflow-hidden">
-                      <video ref={ref as React.LegacyRef<HTMLVideoElement>} className="w-full h-full object-cover" />
+                {/* ★ 自動処理中の表示 */}
+                {autoProcessInfo ? (
+                  <div className="text-center space-y-4">
+                    <div className="flex justify-center mb-4">
+                       {autoProcessInfo.action === 'loan' ? (
+                         <CheckCircle className="w-16 h-16 text-blue-500" />
+                       ) : (
+                         <CheckCircle className="w-16 h-16 text-yellow-500" />
+                       )}
                     </div>
-                  )}
-
-                  {barcodeInput && (
-                    <div className="mb-4 p-4 bg-gray-100 rounded-md">
-                      <p className="font-mono">Barcode: {barcodeInput}</p>
-                    </div>
-                  )}
-                </div>
-
-                {matchingItems.length > 0 && (
-                  <div className="mt-4 border-t pt-4">
-                    <h4 className="text-sm font-semibold mb-2">一致するアイテム:</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {matchingItems.map((item) => {
-                        const imageUrl = item.items?.image;
-                        const itemName = item.items?.name || '不明な物品';
-                        const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明';
-                        const isLoaned = item.status;
-
-                        return (
-                          <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                            <div className="flex items-center gap-2 overflow-hidden mr-2">
-                              {/* 画像表示 */}
-                              <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
-                                {imageUrl && imageUrl.trim() !== '' ? (
-                                  <img
-                                    src={imageUrl}
-                                    alt={itemName}
-                                    className="max-h-full max-w-full object-contain"
-                                  />
-                                ) : (
-                                  <div className="h-full w-full bg-gray-50 flex items-center justify-center">
-                                    <Package className="h-5 w-5 text-gray-400" />
-                                  </div>
-                                )}
-                              </div>
-                              {/* 物品IDと名前表示を追加 */}
-                              <div className="flex flex-col overflow-hidden">
-                                <span className="text-xs font-mono text-gray-700 truncate">{itemIdDisplay}</span>
-                                <span className="text-xs text-gray-500 truncate">{itemName}</span>
-                              </div>
-                            </div>
-                            {/* 貸出/返却ボタンを追加 */}
-                            <button
-                              onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
-                              disabled={isProcessing}
-                              className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
-                                isLoaned
-                                  ? 'bg-yellow-500 hover:bg-yellow-600'
-                                  : 'bg-blue-500 hover:bg-blue-600'
-                              }`}
-                            >
-                              {isLoaned ? '返却' : '貸出'}
-                            </button>
-                          </div>
-                        );
-                      })}
+                    <p className="text-lg font-medium">
+                      物品「<span className="font-bold">{autoProcessInfo.item.items?.name || autoProcessInfo.item.item_id}</span>」を
+                      <span className={`font-bold ${autoProcessInfo.action === 'loan' ? 'text-blue-600' : 'text-yellow-600'}`}>
+                        {autoProcessInfo.action === 'loan' ? '貸出' : '返却'}
+                      </span>
+                      します...
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {Math.ceil(cancelCountdown)}秒後に自動実行します。キャンセルする場合はボタンを押してください。
+                    </p>
+                    <div className="flex justify-center mt-6">
+                      <CancelButton countdown={cancelCountdown} onCancel={() => cancelAutoProcess()} />
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {/* ★ 通常のスキャンUI */}
+                    <div className="mb-6">
+                      <button
+                        onClick={() => {
+                          setIsScanning(!isScanning);
+                          if (!isScanning) {
+                            setShowCamera(true);
+                            setBarcodeInput(''); // スキャン開始時にバーコード入力をクリア
+                            setMatchingItems([]); // 一致リストもクリア
+                          }
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md mb-4 ${
+                          isScanning
+                            ? 'bg-red-500 hover:bg-red-600'
+                            : 'bg-blue-500 hover:bg-blue-600'
+                        } text-white transition-colors w-full justify-center`} // w-full と justify-center を追加
+                      >
+                        {isScanning ? (
+                          <>
+                            <StopCircle size={20} />
+                            スキャン停止
+                          </>
+                        ) : (
+                          <>
+                            <Barcode size={20} />
+                            スキャン開始
+                          </>
+                        )}
+                      </button>
+
+                      {isScanning && showCamera && ( // isScanning 中のみカメラ表示
+                        <div className="relative w-full max-w-lg mx-auto aspect-video mb-4 rounded-lg overflow-hidden border">
+                          <video ref={ref as React.LegacyRef<HTMLVideoElement>} className="w-full h-full object-cover" />
+                           {/* スキャン中インジケーター */}
+                           <div className="absolute inset-0 border-4 border-red-500 animate-pulse pointer-events-none"></div>
+                        </div>
+                      )}
+
+                      {/* バーコード手動入力フィールド */}
+                       <input
+                         type="text"
+                         value={barcodeInput}
+                         onChange={(e) => setBarcodeInput(e.target.value)}
+                         onKeyDown={(e) => {
+                           if (e.key === 'Enter' && barcodeInput) {
+                             handleBarcodeSubmit(barcodeInput);
+                           }
+                         }}
+                         placeholder="バーコードをスキャン or 手動入力してEnter"
+                         className="w-full border border-gray-300 rounded-md p-2 font-mono mt-2"
+                         disabled={isScanning} // スキャン中は無効化
+                       />
+
+                      {/* ★ 複数ヒットした場合の手動選択リスト */}
+                      {matchingItems.length > 0 && (
+                        <div className="mt-4 border-t pt-4">
+                          <h4 className="text-sm font-semibold mb-2 text-red-600">複数ヒットしました。手動で選択してください:</h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto"> {/* 高さを制限 */}
+                            {matchingItems.map((item) => {
+                              const imageUrl = item.items?.image;
+                              const itemName = item.items?.name || '不明な物品';
+                              const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明';
+                              const isLoaned = item.status;
+
+                              return (
+                                <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                  <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                    <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
+                                      {imageUrl && imageUrl.trim() !== '' ? (
+                                        <img src={imageUrl} alt={itemName} className="max-h-full max-w-full object-contain" />
+                                      ) : (
+                                        <div className="h-full w-full bg-gray-50 flex items-center justify-center">
+                                          <Package className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className="text-xs font-mono text-gray-700 truncate">{itemIdDisplay}</span>
+                                      <span className="text-xs text-gray-500 truncate">{itemName}</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
+                                    disabled={isProcessing}
+                                    className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
+                                      isLoaned ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
+                                    }`}
+                                  >
+                                    {isLoaned ? '返却' : '貸出'}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

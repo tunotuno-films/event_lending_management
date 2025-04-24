@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-import { AlertCircle, X, Barcode, StopCircle, Package, CheckCircle } from 'lucide-react';
+import { AlertCircle, X, Barcode, StopCircle, Package, CheckCircle, RotateCcw } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
@@ -88,18 +88,32 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
   );
 };
 
-// ★ キャンセルボタンコンポーネント
-const CancelButton: React.FC<{ countdown: number; onCancel: () => void }> = ({ countdown, onCancel }) => {
+// ★ ActionButton コンポーネント
+const ActionButton: React.FC<{
+  countdown: number;
+  action: 'loan' | 'return';
+  onCancel: () => void; // 貸出時のキャンセル用
+  onReLoan: () => void; // 返却時の再貸出用
+}> = ({ countdown, action, onCancel, onReLoan }) => {
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.max(0, Math.min(1, countdown / 5)); // 0 to 1
   const offset = circumference * (1 - progress);
 
+  const isReturnAction = action === 'return';
+  const buttonColor = isReturnAction ? 'blue' : 'red'; // 返却時は青、貸出時は赤
+  const Icon = isReturnAction ? RotateCcw : X;
+  const hoverBg = isReturnAction ? 'hover:bg-blue-200' : 'hover:bg-red-200';
+  const strokeColor = isReturnAction ? '#3b82f6' : '#ef4444'; // blue-500 or red-500
+  const bgColor = isReturnAction ? '#dbeafe' : '#fee2e2'; // blue-100 or red-100
+  const ariaLabelText = isReturnAction ? '再貸出' : 'キャンセル';
+  const handleClick = isReturnAction ? onReLoan : onCancel;
+
   return (
     <button
-      onClick={onCancel}
-      className="relative w-16 h-16 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors group"
-      aria-label={`キャンセル (${Math.ceil(countdown)}秒)`}
+      onClick={handleClick}
+      className={`relative w-16 h-16 rounded-full bg-${buttonColor}-100 ${hoverBg} flex items-center justify-center transition-colors group`}
+      aria-label={`${ariaLabelText} (${Math.ceil(countdown)}秒)`}
     >
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 50 50">
         <circle
@@ -107,7 +121,7 @@ const CancelButton: React.FC<{ countdown: number; onCancel: () => void }> = ({ c
           cy="25"
           r={radius}
           fill="none"
-          stroke="#fee2e2" // bg-red-100
+          stroke={bgColor}
           strokeWidth="4"
         />
         <circle
@@ -115,16 +129,16 @@ const CancelButton: React.FC<{ countdown: number; onCancel: () => void }> = ({ c
           cy="25"
           r={radius}
           fill="none"
-          stroke="#ef4444" // text-red-500
+          stroke={strokeColor}
           strokeWidth="4"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
           transform="rotate(-90 25 25)"
-          style={{ transition: 'stroke-dashoffset 0.1s linear' }} // アニメーションを滑らかに
+          style={{ transition: 'stroke-dashoffset 0.1s linear' }}
         />
       </svg>
-      <X className="w-8 h-8 text-red-500 z-10 group-hover:scale-110 transition-transform" />
+      <Icon className={`w-8 h-8 text-${buttonColor}-500 z-10 group-hover:scale-110 transition-transform`} />
     </button>
   );
 };
@@ -399,8 +413,8 @@ export default function LoaningControl() {
     }
   }, []);
 
-  const handleLoanItem = async (controlRecord: Control) => {
-    if (isProcessing) return;
+  const handleLoanItem = async (controlRecord: Control): Promise<boolean> => {
+    if (isProcessing) return false; // Explicitly return false
 
     const controlId = controlRecord.control_id;
     const oldItemId = controlRecord.items?.item_id;
@@ -411,7 +425,7 @@ export default function LoaningControl() {
         message: '貸出処理に必要な情報が不足しています',
         type: 'error'
       });
-      return;
+      return false;
     }
 
     setIsProcessing(true);
@@ -428,12 +442,9 @@ export default function LoaningControl() {
 
       if (error) throw error;
 
-      // --- Local state update (Modify Loaned Items) ---
       const loanedItem = { ...controlRecord, status: true, control_datetime: loanTime };
       setWaitingItems(prev => prev.filter(item => item.control_id !== controlId));
-      // Add to the beginning of the loanedItems array
-      setLoanedItems(prev => [loanedItem, ...prev]); 
-      // --- End local state update ---
+      setLoanedItems(prev => [loanedItem, ...prev]);
 
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'loan', success: true }
@@ -445,6 +456,8 @@ export default function LoaningControl() {
         type: 'success'
       });
 
+      return true;
+
     } catch (error) {
       console.error('貸出処理エラー:', error);
       setNotification({
@@ -452,15 +465,15 @@ export default function LoaningControl() {
         message: '貸出処理中にエラーが発生しました',
         type: 'error'
       });
-      // ★ エラー時は自動処理をキャンセル
       cancelAutoProcess();
+      return false;
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleItemReturn = async (controlRecord: Control) => {
-    if (isProcessing) return;
+  const handleItemReturn = async (controlRecord: Control): Promise<boolean> => {
+    if (isProcessing) return false;
 
     const controlId = controlRecord.control_id;
     const loanTime = controlRecord.control_datetime;
@@ -475,7 +488,7 @@ export default function LoaningControl() {
         message: '返却処理に必要な情報が不足しています',
         type: 'error'
       });
-      return;
+      return false;
     }
 
     setIsProcessing(true);
@@ -492,12 +505,9 @@ export default function LoaningControl() {
 
       if (updateError) throw updateError;
 
-      // --- Local state update (Modify Waiting Items) ---
       const returnedItem = { ...controlRecord, status: false, control_datetime: null };
       setLoanedItems(prev => prev.filter(item => item.control_id !== controlId));
-      // Add to the beginning of the waitingItems array
-      setWaitingItems(prev => [returnedItem, ...prev]); 
-      // --- End local state update ---
+      setWaitingItems(prev => [returnedItem, ...prev]);
 
       window.dispatchEvent(new CustomEvent('loan-status-changed', {
         detail: { type: 'return', success: true }
@@ -520,7 +530,7 @@ export default function LoaningControl() {
           if (resultError) {
             console.error('履歴記録エラー:', resultError);
           } else {
-            historyRecorded = true; // 履歴記録成功
+            historyRecorded = true;
           }
         } catch (historyError) {
           console.error('履歴記録中にエラーが発生:', historyError);
@@ -541,6 +551,8 @@ export default function LoaningControl() {
         type: 'success'
       });
 
+      return true;
+
     } catch (error) {
       console.error('返却処理エラー:', error);
       setNotification({
@@ -548,26 +560,24 @@ export default function LoaningControl() {
         message: '返却処理中にエラーが発生しました',
         type: 'error'
       });
-       // ★ エラー時は自動処理をキャンセル
       cancelAutoProcess();
+      return false;
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // ★ handleBarcodeSubmit を修正
   const handleBarcodeSubmit = async (barcode: string) => {
     if (!selectedEventId) {
       setNotification({ show: true, message: 'イベントを選択してください', type: 'error' });
       return;
     }
-    if (isProcessing) return; // 処理中の重複実行防止
+    if (isProcessing) return;
 
-    // 既存の自動処理タイマーがあればクリア
-    cancelAutoProcess(false); // 通知なしでキャンセル
+    cancelAutoProcess(false);
 
-    setIsProcessing(true); // 検索処理中フラグ
-    setBarcodeInput(barcode); // スキャンされたバーコードを表示用に保持
+    setIsProcessing(true);
+    setBarcodeInput(barcode);
 
     try {
       const { data, error } = await supabase
@@ -583,14 +593,13 @@ export default function LoaningControl() {
 
       if (!data || data.length === 0) {
         setNotification({ show: true, message: `物品が見つかりません (ID: ${barcode})`, type: 'error' });
-        setMatchingItems([]); // 一致リストをクリア
-        setAutoProcessInfo(null); // 自動処理情報をクリア
+        setMatchingItems([]);
+        setAutoProcessInfo(null);
         return;
       }
 
       if (data.length > 1) {
         setNotification({ show: true, message: `複数の物品が見つかりました (ID: ${barcode})。手動で選択してください。`, type: 'error' });
-        // 複数ヒットした場合の処理（例：matchingItems にセットして手動選択させる）
         const formattedData = data.map(item => ({
           ...item,
           items: Array.isArray(item.items) ? item.items[0] : item.items,
@@ -598,11 +607,10 @@ export default function LoaningControl() {
           created_by: item.created_by || ''
         })) as Control[];
         setMatchingItems(formattedData);
-        setAutoProcessInfo(null); // 自動処理情報をクリア
+        setAutoProcessInfo(null);
         return;
       }
 
-      // --- 該当アイテムが1つの場合：自動処理開始 ---
       const itemToProcess = {
         ...data[0],
         items: Array.isArray(data[0].items) ? data[0].items[0] : data[0].items,
@@ -612,10 +620,9 @@ export default function LoaningControl() {
 
       const action = itemToProcess.status ? 'return' : 'loan';
       setAutoProcessInfo({ item: itemToProcess, action });
-      setCancelCountdown(5); // カウントダウンリセット
-      setMatchingItems([]); // 手動選択リストはクリア
+      setCancelCountdown(5);
+      setMatchingItems([]);
 
-      // 5秒後に confirmAutoProcess を実行するタイマーを設定
       const timerId = setTimeout(() => {
         confirmAutoProcess();
       }, 5000);
@@ -627,15 +634,13 @@ export default function LoaningControl() {
       setAutoProcessInfo(null);
       setMatchingItems([]);
     } finally {
-      setIsProcessing(false); // 検索処理完了
+      setIsProcessing(false);
     }
   };
 
-  // ★ 自動処理実行関数
-  const confirmAutoProcess = () => {
+  const confirmAutoProcess = async () => {
     if (!autoProcessInfo || isProcessing) return;
 
-    // タイマーをクリア（手動キャンセルや完了前に呼ばれた場合）
     if (autoProcessTimerId) {
       clearTimeout(autoProcessTimerId);
       setAutoProcessTimerId(null);
@@ -643,21 +648,21 @@ export default function LoaningControl() {
 
     const { item, action } = autoProcessInfo;
 
-    // 貸出/返却処理を実行
+    let success = false;
     if (action === 'loan') {
-      handleLoanItem(item);
+      success = await handleLoanItem(item);
     } else {
-      handleItemReturn(item);
+      success = await handleItemReturn(item);
     }
 
-    // モーダルを閉じて state をリセット
-    setShowBarcodeModal(false);
-    setAutoProcessInfo(null);
-    setCancelCountdown(5);
-    setBarcodeInput(''); // バーコード入力もクリア
+    if (success) {
+      setShowBarcodeModal(false);
+      setAutoProcessInfo(null);
+      setCancelCountdown(5);
+      setBarcodeInput('');
+    }
   };
 
-  // ★ 自動処理キャンセル関数
   const cancelAutoProcess = (showNotification = true) => {
     if (autoProcessTimerId) {
       clearTimeout(autoProcessTimerId);
@@ -665,10 +670,38 @@ export default function LoaningControl() {
     }
     setAutoProcessInfo(null);
     setCancelCountdown(5);
-    // バーコード入力はクリアしないでおく（再スキャンや手動入力のため）
-    // setBarcodeInput('');
     if (showNotification) {
       setNotification({ show: true, message: '処理をキャンセルしました', type: 'success' });
+    }
+  };
+
+  const handleReLoan = async () => {
+    if (!autoProcessInfo || autoProcessInfo.action !== 'return' || isProcessing) return;
+
+    if (autoProcessTimerId) {
+      clearTimeout(autoProcessTimerId);
+      setAutoProcessTimerId(null);
+    }
+
+    const { item } = autoProcessInfo;
+
+    const returnSuccess = await handleItemReturn(item);
+
+    let loanSuccess = false;
+    if (returnSuccess) {
+      const itemToReLoan = { ...item, status: false, control_datetime: null };
+      loanSuccess = await handleLoanItem(itemToReLoan);
+    }
+
+    if (returnSuccess && loanSuccess) {
+       setNotification({ show: true, message: `アイテム「${item.items?.name || item.item_id}」を再貸出しました`, type: 'success' });
+       setShowBarcodeModal(false);
+       setAutoProcessInfo(null);
+       setCancelCountdown(5);
+       setBarcodeInput('');
+    } else if (returnSuccess && !loanSuccess) {
+        setNotification({ show: true, message: '返却は成功しましたが、再貸出に失敗しました', type: 'error' });
+        setAutoProcessInfo(null);
     }
   };
 
@@ -763,7 +796,7 @@ export default function LoaningControl() {
           </div>
 
           {showBarcodeModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"> {/* モーダル外クリック防止のため padding を追加 */}
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold">バーコードで貸出/返却</h3>
@@ -771,7 +804,7 @@ export default function LoaningControl() {
                     onClick={() => {
                       setShowBarcodeModal(false);
                       setIsScanning(false);
-                      cancelAutoProcess(false); // モーダルを閉じるときは自動処理もキャンセル
+                      cancelAutoProcess(false);
                     }}
                     className="text-gray-500 hover:text-gray-700"
                   >
@@ -779,7 +812,6 @@ export default function LoaningControl() {
                   </button>
                 </div>
 
-                {/* ★ 自動処理中の表示 */}
                 {autoProcessInfo ? (
                   <div className="text-center space-y-4">
                     <div className="flex justify-center mb-4">
@@ -797,30 +829,35 @@ export default function LoaningControl() {
                       します...
                     </p>
                     <p className="text-sm text-gray-500">
-                      {Math.ceil(cancelCountdown)}秒後に自動実行します。キャンセルする場合はボタンを押してください。
+                      {Math.ceil(cancelCountdown)}秒後に自動実行します。
+                      {autoProcessInfo.action === 'return' ? '再貸出する場合はボタンを押してください。' : 'キャンセルする場合はボタンを押してください。'}
                     </p>
                     <div className="flex justify-center mt-6">
-                      <CancelButton countdown={cancelCountdown} onCancel={() => cancelAutoProcess()} />
+                      <ActionButton
+                        countdown={cancelCountdown}
+                        action={autoProcessInfo.action}
+                        onCancel={cancelAutoProcess}
+                        onReLoan={handleReLoan}
+                      />
                     </div>
                   </div>
                 ) : (
                   <>
-                    {/* ★ 通常のスキャンUI */}
                     <div className="mb-6">
                       <button
                         onClick={() => {
                           setIsScanning(!isScanning);
                           if (!isScanning) {
                             setShowCamera(true);
-                            setBarcodeInput(''); // スキャン開始時にバーコード入力をクリア
-                            setMatchingItems([]); // 一致リストもクリア
+                            setBarcodeInput('');
+                            setMatchingItems([]);
                           }
                         }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-md mb-4 ${
                           isScanning
                             ? 'bg-red-500 hover:bg-red-600'
                             : 'bg-blue-500 hover:bg-blue-600'
-                        } text-white transition-colors w-full justify-center`} // w-full と justify-center を追加
+                        } text-white transition-colors w-full justify-center`}
                       >
                         {isScanning ? (
                           <>
@@ -835,34 +872,17 @@ export default function LoaningControl() {
                         )}
                       </button>
 
-                      {isScanning && showCamera && ( // isScanning 中のみカメラ表示
+                      {isScanning && showCamera && (
                         <div className="relative w-full max-w-lg mx-auto aspect-video mb-4 rounded-lg overflow-hidden border">
                           <video ref={ref as React.LegacyRef<HTMLVideoElement>} className="w-full h-full object-cover" />
-                           {/* スキャン中インジケーター */}
-                           <div className="absolute inset-0 border-4 border-red-500 animate-pulse pointer-events-none"></div>
+                            <div className="absolute inset-0 border-4 border-red-500 animate-pulse pointer-events-none"></div>
                         </div>
                       )}
 
-                      {/* バーコード手動入力フィールド */}
-                       <input
-                         type="text"
-                         value={barcodeInput}
-                         onChange={(e) => setBarcodeInput(e.target.value)}
-                         onKeyDown={(e) => {
-                           if (e.key === 'Enter' && barcodeInput) {
-                             handleBarcodeSubmit(barcodeInput);
-                           }
-                         }}
-                         placeholder="バーコードをスキャン or 手動入力してEnter"
-                         className="w-full border border-gray-300 rounded-md p-2 font-mono mt-2"
-                         disabled={isScanning} // スキャン中は無効化
-                       />
-
-                      {/* ★ 複数ヒットした場合の手動選択リスト */}
                       {matchingItems.length > 0 && (
                         <div className="mt-4 border-t pt-4">
                           <h4 className="text-sm font-semibold mb-2 text-red-600">複数ヒットしました。手動で選択してください:</h4>
-                          <div className="space-y-2 max-h-40 overflow-y-auto"> {/* 高さを制限 */}
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
                             {matchingItems.map((item) => {
                               const imageUrl = item.items?.image;
                               const itemName = item.items?.name || '不明な物品';
@@ -965,13 +985,12 @@ export default function LoaningControl() {
                       {matchingItems.map((item) => {
                         const imageUrl = item.items?.image;
                         const itemName = item.items?.name || '不明な物品';
-                        const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明'; // item_id もフォールバック
+                        const itemIdDisplay = item.items?.item_id || item.item_id || 'ID不明';
                         const isLoaned = item.status;
 
                         return (
                           <div key={item.control_id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                             <div className="flex items-center gap-2 overflow-hidden mr-2">
-                              {/* 画像表示 */}
                               <div className="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-white border flex-shrink-0">
                                 {imageUrl && imageUrl.trim() !== '' ? (
                                   <img
@@ -985,13 +1004,11 @@ export default function LoaningControl() {
                                   </div>
                                 )}
                               </div>
-                              {/* 物品IDと名前表示を追加 */}
                               <div className="flex flex-col overflow-hidden">
                                 <span className="text-xs font-mono text-gray-700 truncate">{itemIdDisplay}</span>
                                 <span className="text-xs text-gray-500 truncate">{itemName}</span>
                               </div>
                             </div>
-                            {/* 貸出/返却ボタンを追加 */}
                             <button
                               onClick={() => isLoaned ? handleItemReturn(item) : handleLoanItem(item)}
                               disabled={isProcessing}
@@ -1022,7 +1039,7 @@ export default function LoaningControl() {
                 </div>
               </div>
               <div className="p-4">
-                {isLoadingItems ? ( // isLoadingItems が true の場合にローディング表示
+                {isLoadingItems ? (
                   <LoadingIndicator />
                 ) : (
                   <div className="overflow-x-auto max-h-96 overflow-y-auto">
@@ -1090,7 +1107,7 @@ export default function LoaningControl() {
                 </div>
               </div>
               <div className="p-4">
-                {isLoadingItems ? ( // isLoadingItems が true の場合にローディング表示
+                {isLoadingItems ? (
                   <LoadingIndicator />
                 ) : (
                   <div className="overflow-x-auto max-h-96 overflow-y-auto">

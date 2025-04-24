@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, insertWithOwnerId } from '../lib/supabase';
-import { AlertCircle, X, Barcode, StopCircle, Package, CheckCircle, RotateCcw } from 'lucide-react';
+// ★ ArrowUpRight, ArrowDownRight をインポート
+import { AlertCircle, X, Barcode, StopCircle, Package, RotateCcw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import LoadingIndicator from './LoadingIndicator'; // LoadingIndicator をインポート
 
@@ -161,6 +162,7 @@ export default function LoaningControl() {
   const [matchingItems, setMatchingItems] = useState<Control[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
+  const [mergeItemsInModal, setMergeItemsInModal] = useState(false); // ★ 新しい state を追加
 
   // ★ 自動処理用の state を追加
   const [autoProcessInfo, setAutoProcessInfo] = useState<{ item: Control; action: 'loan' | 'return' } | null>(null);
@@ -799,7 +801,28 @@ export default function LoaningControl() {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">バーコードで貸出/返却</h3>
+                  {/* ★ ヘッダー部分にトグルスイッチを追加 */}
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-lg font-semibold">バーコードで貸出/返却</h3>
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => setMergeItemsInModal(!mergeItemsInModal)}
+                        className={`${
+                          mergeItemsInModal ? 'bg-blue-600' : 'bg-gray-200'
+                        } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                        role="switch"
+                        aria-checked={mergeItemsInModal}
+                      >
+                        <span
+                          className={`${
+                            mergeItemsInModal ? 'translate-x-6' : 'translate-x-1'
+                          } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
+                        />
+                      </button>
+                      <span className="ml-2 text-sm font-medium text-gray-700">連続読み取り</span>
+                    </div>
+                  </div>
                   <button
                     onClick={() => {
                       setShowBarcodeModal(false);
@@ -815,11 +838,12 @@ export default function LoaningControl() {
                 {autoProcessInfo ? (
                   <div className="text-center space-y-4">
                     <div className="flex justify-center mb-4">
-                       {autoProcessInfo.action === 'loan' ? (
-                         <CheckCircle className="w-16 h-16 text-blue-500" />
-                       ) : (
-                         <CheckCircle className="w-16 h-16 text-yellow-500" />
-                       )}
+                       {/* ★ アイコンを ArrowUpRight と ArrowDownRight に変更 */}
+                        {autoProcessInfo.action === 'loan' ? (
+                          <ArrowUpRight className="w-16 h-16 text-blue-500" /> // 貸出アイコン
+                        ) : (
+                          <ArrowDownRight className="w-16 h-16 text-yellow-500" /> // 返却アイコン
+                        )}
                     </div>
                     <p className="text-lg font-medium">
                       物品「<span className="font-bold">{autoProcessInfo.item.items?.name || autoProcessInfo.item.item_id}</span>」を

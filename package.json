@@ -57,7 +57,8 @@
       "autotable",
       "onclone",
       "gsap",
-      "googleusercontent"
+      "googleusercontent",
+      "jspdf"
     ]
   }
 }

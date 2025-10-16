@@ -607,7 +607,12 @@ export default function LoaningControl() {
         setNotification({ show: true, message: `物品が見つかりません (ID: ${barcode})`, type: 'error' });
         setMatchingItems([]);
         setAutoProcessInfo(null);
-        return;
+        // ★ 1秒後にスキャンを再開
+        setTimeout(() => {
+          setIsScanning(true);
+          setShowCamera(true);
+        }, 1000); 
+        return; 
       }
 
       if (data.length > 1) {
@@ -647,13 +652,11 @@ export default function LoaningControl() {
       setNotification({ show: true, message: 'バーコード処理中にエラーが発生しました', type: 'error' });
       setAutoProcessInfo(null);
       setMatchingItems([]);
-      if (mergeItemsInModal) {
+      // ★ エラー時も常に1.5秒後に再開試行
+      setTimeout(() => {
         setIsScanning(true);
         setShowCamera(true);
-      } else {
-        setIsScanning(false);
-        setShowCamera(false);
-      }
+      }, 1500); 
     } finally {
       setIsProcessing(false);
     }
@@ -1123,8 +1126,8 @@ export default function LoaningControl() {
                               disabled={isProcessing}
                               className={`px-3 py-1 rounded-md text-xs text-white disabled:opacity-50 whitespace-nowrap ${
                                 isLoaned
-                                  ? 'bg-yellow-500 hover:bg-yellow-600'
-                                  : 'bg-blue-500 hover:bg-blue-600'
+                                  ? 'bg-orange-500 hover:bg-orange-600' // 返却ボタン (オレンジ)
+                                  : 'bg-green-500 hover:bg-green-600' // 貸出ボタン (緑)
                               }`}
                             >
                               {isLoaned ? '返却' : '貸出'}
@@ -1195,7 +1198,8 @@ export default function LoaningControl() {
                                   <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
                                 </td>
                                 <td className="px-4 py-2">
-                                  <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
+                                  {/* ★ 貸出ボタンの色を緑に変更 */}
+                                  <button onClick={() => handleLoanItem(control)} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">貸出</button>
                                 </td>
                               </tr>
                             );
@@ -1264,7 +1268,8 @@ export default function LoaningControl() {
                                   <span className="text-sm truncate" title={control.items?.name ?? '不明な物品'}>{control.items?.name ?? '不明な物品'}</span>
                                 </td>
                                 <td className="px-4 py-2">
-                                  <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
+                                  {/* ★ 返却ボタンの色をオレンジに変更 */}
+                                  <button onClick={() => handleItemReturn(control)} disabled={isProcessing} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 whitespace-nowrap">
                                     返却
                                   </button>
                                 </td>
